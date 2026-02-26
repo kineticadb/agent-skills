@@ -1,6 +1,8 @@
 kinetica-core-rules.md
 sql-functions.md
 sql-patterns.md
+ddl-reference.md
+dml-reference.md
 geospatial-functions.md
 geospatial-examples.md
 timeseries-functions.md

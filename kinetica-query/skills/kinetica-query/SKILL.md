@@ -17,15 +17,19 @@ Read [references/kinetica-core-rules.md](references/kinetica-core-rules.md) befo
 - No backticks — use double quotes for identifiers
 - `DATEDIFF` / `DATEADD` instead of timestamp arithmetic
 - Case-sensitive identifiers — always match exact column names
-- No `LEFT JOIN` keyword — use inner join with WHERE, or `LEFT OUTER JOIN`
 - `DECIMAL` not `NUMERIC`
 
 ## Domain Capabilities
 
 ### SQL Core
 See [references/kinetica-core-rules.md](references/kinetica-core-rules.md) — **read this first**.
-See [references/sql-functions.md](references/sql-functions.md) for supported functions.
+See [references/sql-functions.md](references/sql-functions.md) for Kinetica-specific functions.
 See [references/sql-patterns.md](references/sql-patterns.md) for common query patterns.
+
+### DDL & DML
+CREATE TABLE with shard keys, partitioning, tier strategies, vector indexes.
+LOAD DATA for bulk ingestion, EXPORT for data extraction, upsert hints.
+See [references/ddl-reference.md](references/ddl-reference.md) and [references/dml-reference.md](references/dml-reference.md).
 
 ### Geospatial
 ST_* and accelerated STXY_* functions, H3 spatial indexing, SRID 4326 only,

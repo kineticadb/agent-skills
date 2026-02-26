@@ -1,72 +1,183 @@
-# Time-Series Functions Reference
+# Kinetica Time-Series Reference
 
-Use these with `toolbelt_sql` when questions involve trends, temporal patterns, or time bucketing.
+Standard PostgreSQL window functions and date/time extraction work.
+This covers Kinetica-specific time-series features and deviations.
 
-## Time Bucketing
-| Function | Description |
-|----------|-------------|
-| `DATETIME_BUCKET(ts, INTERVAL '1 HOUR')` | Bucket into fixed intervals |
-| `DATE_TRUNC('day', ts)` | Truncate to day/week/month/year boundary |
-| `EXTRACT(unit FROM ts)` | Extract YEAR, MONTH, DAY, HOUR, MINUTE, SECOND |
+## CRITICAL: Timestamp Arithmetic
 
-## Window Functions
-| Function | Description |
-|----------|-------------|
-| `LAG(col, n) OVER (ORDER BY ts)` | Value n rows back (default 1) |
-| `LEAD(col, n) OVER (ORDER BY ts)` | Value n rows ahead (default 1) |
-| `FIRST_VALUE(col) OVER (ORDER BY ts)` | First value in window |
-| `LAST_VALUE(col) OVER (ORDER BY ts)` | Last value in window |
-| `ROW_NUMBER() OVER (ORDER BY ts)` | Sequential row number |
-| `RANK() OVER (ORDER BY col)` | Rank with gaps for ties |
-| `DENSE_RANK() OVER (ORDER BY col)` | Rank without gaps |
+Kinetica does NOT support direct timestamp subtraction (`ts1 - ts2`).
+Always use `DATEDIFF`:
 
-## Moving Aggregates
 ```sql
--- 7-day moving average
-AVG(value) OVER (ORDER BY ts ROWS BETWEEN 6 PRECEDING AND CURRENT ROW)
+-- WRONG — will fail
+SELECT "end_time" - "start_time" AS "duration" FROM "schema"."events"
 
--- Cumulative sum
-SUM(value) OVER (ORDER BY ts ROWS UNBOUNDED PRECEDING)
-
--- Moving min/max (30-day window)
-MIN(value) OVER (ORDER BY ts ROWS BETWEEN 29 PRECEDING AND CURRENT ROW)
-MAX(value) OVER (ORDER BY ts ROWS BETWEEN 29 PRECEDING AND CURRENT ROW)
+-- CORRECT
+SELECT DATEDIFF('HOUR', "start_time", "end_time") AS "duration_hours"
+FROM "schema"."events"
 ```
 
-## Date Arithmetic
+## Date/Time Functions — Kinetica Differences
 
-**CRITICAL**: Do NOT subtract timestamps directly. Use `DATEDIFF`.
+| Function | Description | PostgreSQL Equivalent |
+|----------|-------------|---------------------|
+| `DATEDIFF('unit', start, end)` | Difference in unit | `EXTRACT(EPOCH FROM end-start)` |
+| `DATEDIFF(end, begin)` | Difference in **days** (2-arg) | `end::date - begin::date` |
+| `DATEADD('unit', amount, dt)` | Add interval | `dt + INTERVAL '...'` |
+| `TIME_BUCKET(INTERVAL, ts [, offset [, base]])` | Bucket timestamps | `date_bin()` (PG14+) |
+| `DATETIME_BUCKET(ts, INTERVAL)` | Alias (arg order swapped) | — |
+| `DATE_BUCKET(width, ds [, offset [, base]])` | Bucket dates | — |
+| `DAYOFWEEK(dt)` | **1=Sunday...7=Saturday** | `EXTRACT(DOW)` is 0=Sunday |
+| `DAYNAME(dt)` | 'Monday', 'Tuesday'... | `to_char(dt, 'Day')` |
+| `EPOCH_MSECS_TO_DATETIME(ms)` | Epoch ms → datetime | — |
+| `EPOCH_SECS_TO_DATETIME(secs)` | Epoch secs → datetime | `to_timestamp(secs)` |
+| `MSECS_SINCE_EPOCH(ts)` | datetime → epoch ms | — |
+| `SECS_SINCE_EPOCH(ts)` | datetime → epoch secs | — |
+| `UNIX_TIMESTAMP(ts)` | Alias for SECS_SINCE_EPOCH | — |
+| `TIMESTAMP_FROM_DATE_TIME(d, t)` | Combine date + time | — |
+| `DATE_TO_EPOCH_MSECS(y,m,d,h,mi,s,ms)` | Components → epoch ms | — |
+| `TIMESTAMPADD(unit, n, dt)` | Alias for DATEADD | — |
+| `TIMESTAMPDIFF(unit, start, end)` | Alias for DATEDIFF | — |
 
-| Function | Description |
-|----------|-------------|
-| `DATEDIFF('unit', start, end)` | Difference in specified unit |
-| `DATEADD('unit', amount, datetime)` | Add amount to datetime |
-| `NOW()` | Current timestamp |
-| `DAYNAME(date)` | Full day name ('Monday', etc.) |
-| `DAYOFWEEK(date)` | 1=Sunday through 7=Saturday |
+Units: `MICROSECOND`, `MILLISECOND`, `SECOND`, `MINUTE`, `HOUR`, `DAY`, `WEEK`, `MONTH`, `QUARTER`, `YEAR`
 
-Units: MICROSECOND, MILLISECOND, SECOND, MINUTE, HOUR, DAY, WEEK, MONTH, QUARTER, YEAR
+**INTERVAL syntax:** `INTERVAL '30' MINUTE`, `INTERVAL '1' DAY`
+Also supports: `dt + INTERVAL '7' DAY`, `dt - INTERVAL '1' HOUR`
 
-**INTERVAL syntax**: `INTERVAL '30' MINUTE`, `INTERVAL '1' DAY`
+## ASOF Joins (Kinetica-Specific)
 
-## ASOF Joins
+Join time-series data to the closest matching record within a time window.
+**No PostgreSQL equivalent** — would require complex `LATERAL` joins.
 
-Join time-series data based on closest preceding/succeeding timestamp:
-
-`ASOF(left_time, right_time, range_begin, range_end, MIN|MAX)`
-- `MIN`: closest record at or before
-- `MAX`: closest record at or after
+**Syntax:** `ASOF(left_ts, right_ts, range_begin, range_end, MIN|MAX)`
+- `MIN`: find closest record at or **before** left timestamp
+- `MAX`: find closest record at or **after** left timestamp
+- Range args are `INTERVAL` types defining the search window
 
 ```sql
-SELECT "t"."trade_id", "q"."price" AS "quote_price_at_trade"
+-- Find the latest quote within 10 seconds before each trade
+SELECT "t"."trade_id", "t"."trade_ts",
+    "q"."price" AS "quote_price", "q"."quote_ts"
 FROM "trades" AS "t"
 INNER JOIN "quotes" AS "q"
     ON "t"."symbol" = "q"."symbol"
-    AND ASOF("t"."trade_ts", "q"."quote_ts", INTERVAL '0' SECOND, INTERVAL '10' SECOND, MIN)
+    AND ASOF("t"."trade_ts", "q"."quote_ts",
+             INTERVAL '0' SECOND, INTERVAL '10' SECOND, MIN)
+LIMIT 100
 ```
 
-## Common Intervals
-- `INTERVAL '1 MINUTE'`, `'5 MINUTES'`, `'15 MINUTES'`
-- `INTERVAL '1 HOUR'`, `'6 HOURS'`, `'12 HOURS'`
-- `INTERVAL '1 DAY'`, `'7 DAYS'`, `'30 DAYS'`
-- `INTERVAL '1 MONTH'`, `'3 MONTHS'`, `'1 YEAR'`
+```sql
+-- Match sensor readings to the nearest weather observation within 5 minutes
+SELECT "s"."sensor_id", "s"."reading", "w"."temperature"
+FROM "schema"."sensor_data" AS "s"
+INNER JOIN "schema"."weather" AS "w"
+    ON "s"."station_id" = "w"."station_id"
+    AND ASOF("s"."ts", "w"."observation_ts",
+             INTERVAL '5' MINUTE, INTERVAL '5' MINUTE, MIN)
+```
+
+Note: Materialized view restrictions apply to ASOF joins (workaround: `KI_HINT_PROJECT_MATERIALIZED_VIEW`).
+
+## Time Bucketing Patterns
+
+```sql
+-- Hourly aggregation
+SELECT TIME_BUCKET(INTERVAL '1' HOUR, "event_ts") AS "hour",
+    COUNT(*) AS "events", AVG("value") AS "avg_value"
+FROM "schema"."events"
+WHERE "event_ts" >= DATEADD('DAY', -7, NOW())
+GROUP BY "hour"
+ORDER BY "hour"
+
+-- 15-minute buckets
+SELECT TIME_BUCKET(INTERVAL '15' MINUTE, "ts") AS "bucket",
+    SUM("bytes") AS "total_bytes"
+FROM "schema"."network_traffic"
+GROUP BY "bucket"
+ORDER BY "bucket"
+
+-- Daily using DATE_TRUNC
+SELECT DATE_TRUNC('day', "created_at") AS "day",
+    COUNT(*) AS "orders", SUM("total") AS "revenue"
+FROM "schema"."orders"
+GROUP BY "day"
+ORDER BY "day"
+```
+
+## Window Functions — Kinetica Notes
+
+Standard PostgreSQL window functions work. Kinetica additions:
+- `IGNORE NULLS` / `RESPECT NULLS` on `LAG`, `LEAD`, `FIRST_VALUE`, `LAST_VALUE`
+
+**CRITICAL REMINDER**: Window functions CANNOT be nested inside aggregate functions.
+Always use CTEs:
+
+```sql
+-- Period-over-period comparison
+WITH "daily" AS (
+    SELECT DATE_TRUNC('day', "ts") AS "day",
+        SUM("revenue") AS "daily_revenue"
+    FROM "schema"."sales"
+    GROUP BY "day"
+),
+"with_lag" AS (
+    SELECT *,
+        LAG("daily_revenue") OVER (ORDER BY "day") AS "prev_day_revenue"
+    FROM "daily"
+)
+SELECT "day", "daily_revenue", "prev_day_revenue",
+    ROUND(("daily_revenue" - "prev_day_revenue") * 100.0 / "prev_day_revenue", 2) AS "pct_change"
+FROM "with_lag"
+WHERE "prev_day_revenue" IS NOT NULL
+ORDER BY "day"
+LIMIT 100
+```
+
+## Moving Aggregates
+
+```sql
+-- 7-day moving average
+AVG("value") OVER (ORDER BY "ts" ROWS BETWEEN 6 PRECEDING AND CURRENT ROW)
+
+-- Cumulative sum
+SUM("value") OVER (ORDER BY "ts" ROWS UNBOUNDED PRECEDING)
+
+-- Moving min/max
+MIN("value") OVER (ORDER BY "ts" ROWS BETWEEN 29 PRECEDING AND CURRENT ROW)
+```
+
+## Complex Duration Calculations
+
+```sql
+-- Duration in hours between first and last event per track
+SELECT "TRACKID",
+    DATEDIFF('HOUR', MIN("TIMESTAMP"), MAX("TIMESTAMP")) AS "hours"
+FROM "tracking"."positions"
+GROUP BY "TRACKID"
+
+-- Multi-unit: total hours including partial days
+SELECT "TRACKID",
+    DATEDIFF('DAY', MIN("TIMESTAMP"), MAX("TIMESTAMP")) * 24 +
+    DATEDIFF('HOUR',
+        DATEADD('DAY', DATEDIFF('DAY', MIN("TIMESTAMP"), MAX("TIMESTAMP")), MIN("TIMESTAMP")),
+        MAX("TIMESTAMP")
+    ) AS "total_hours"
+FROM "tracking"."positions"
+GROUP BY "TRACKID"
+```
+
+## Gap Detection
+
+```sql
+WITH "with_gaps" AS (
+    SELECT "sensor_id", "ts",
+        LAG("ts") OVER (PARTITION BY "sensor_id" ORDER BY "ts") AS "prev_ts"
+    FROM "schema"."readings"
+)
+SELECT "sensor_id", "prev_ts" AS "gap_start", "ts" AS "gap_end",
+    DATEDIFF('MINUTE', "prev_ts", "ts") AS "gap_minutes"
+FROM "with_gaps"
+WHERE DATEDIFF('MINUTE', "prev_ts", "ts") > 60
+ORDER BY "gap_minutes" DESC
+LIMIT 100
+```
