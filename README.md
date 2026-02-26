@@ -12,12 +12,15 @@ Knowledge plugins that teach AI agents to work with [Kinetica](https://www.kinet
 
 ## Install
 
-**Claude Code:**
-```bash
-claude install-plugin kineticadb/agent-skills/kinetica-query
+**Claude Code — add the marketplace, then install a plugin:**
+```
+/plugin marketplace add kineticadb/agent-skills
+/plugin install kinetica-query@kineticadb-agent-skills
 ```
 
-**Manual:** Copy a plugin directory into your project's `.claude/plugins/`.
+Or run `/plugin` to browse and install interactively.
+
+**Manual:** Copy a plugin directory (e.g. `kinetica-query/`) into your project's `.claude/plugins/`.
 
 ## Project Structure
 
