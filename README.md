@@ -20,6 +20,12 @@ Knowledge plugins that teach AI agents to work with [Kinetica](https://www.kinet
 
 Or run `/plugin` to browse and install interactively.
 
+**Uninstall:**
+```
+/plugin uninstall kinetica-query@kineticadb-agent-skills
+/plugin marketplace remove kineticadb-agent-skills
+```
+
 **Manual:** Copy a plugin directory (e.g. `kinetica-query/`) into your project's `.claude/plugins/`.
 
 ## Project Structure
