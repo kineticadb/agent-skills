@@ -1,0 +1,21 @@
+name: Check references in sync
+
+on:
+  pull_request:
+
+jobs:
+  check-refs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run build.sh
+        run: bash build.sh
+
+      - name: Check for drift
+        run: |
+          if ! git diff --quiet; then
+            echo "References are out of sync with knowledge/. Run ./build.sh and commit."
+            git diff --stat
+            exit 1
+          fi

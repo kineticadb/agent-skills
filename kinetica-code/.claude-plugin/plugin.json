@@ -1,0 +1,11 @@
+{
+  "name": "kinetica-code",
+  "description": "Kinetica application development knowledge — teaches agents to write Python applications using the Kinetica Python SDK, REST API, and data pipeline patterns.",
+  "author": {
+    "name": "Kinetica",
+    "email": "support@kinetica.com"
+  },
+  "homepage": "https://github.com/kineticadb/agent-skills",
+  "license": "MIT",
+  "keywords": ["database", "python", "sdk", "kinetica", "development", "api", "data-pipelines"]
+}

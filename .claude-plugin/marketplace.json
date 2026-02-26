@@ -1,0 +1,51 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "kineticadb-agent-skills",
+  "description": "Kinetica knowledge plugins — teaches AI agents to write correct SQL, build applications, and administer Kinetica's GPU-accelerated database.",
+  "owner": {
+    "name": "Kinetica",
+    "email": "support@kinetica.com"
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "homepage": "https://github.com/kineticadb/agent-skills"
+  },
+  "plugins": [
+    {
+      "name": "kinetica-query",
+      "description": "Kinetica SQL query knowledge for data analytics — geospatial, time-series, vector search, graph, and core SQL rules.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Kinetica"
+      },
+      "source": "./kinetica-query",
+      "category": "data",
+      "homepage": "https://github.com/kineticadb/agent-skills",
+      "keywords": ["database", "analytics", "sql", "gpu", "vector-search", "geospatial", "time-series", "graph"]
+    },
+    {
+      "name": "kinetica-code",
+      "description": "Kinetica application development — Python SDK, REST API, data pipeline patterns, and embedded SQL knowledge.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Kinetica"
+      },
+      "source": "./kinetica-code",
+      "category": "data",
+      "homepage": "https://github.com/kineticadb/agent-skills",
+      "keywords": ["database", "python", "sdk", "kinetica", "development", "api", "data-pipelines"]
+    },
+    {
+      "name": "kinetica-admin",
+      "description": "Kinetica database administration — system tables, EXPLAIN plans, resource groups, tier management, and diagnostics.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Kinetica"
+      },
+      "source": "./kinetica-admin",
+      "category": "data",
+      "homepage": "https://github.com/kineticadb/agent-skills",
+      "keywords": ["database", "admin", "dba", "kinetica", "monitoring", "performance", "optimization"]
+    }
+  ]
+}
