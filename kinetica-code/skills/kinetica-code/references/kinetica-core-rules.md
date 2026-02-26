@@ -8,12 +8,12 @@ When no Kinetica-specific rule exists, fall back to PostgreSQL.
 
 These PostgreSQL features work in Kinetica without modification:
 - Standard `SELECT`, `WHERE`, `GROUP BY`, `HAVING`, `ORDER BY`
-- `INNER JOIN`, `LEFT OUTER JOIN`, `RIGHT OUTER JOIN`, `FULL OUTER JOIN`, `CROSS JOIN`
+- `INNER JOIN`, `LEFT OUTER JOIN`, `RIGHT OUTER JOIN`, `FULL OUTER JOIN`, `CROSS JOIN`, `[LEFT] SEMI JOIN`
 - `UNION [ALL]`, `INTERSECT [ALL]`, `EXCEPT [ALL]`
 - Window functions: `ROW_NUMBER`, `RANK`, `DENSE_RANK`, `LAG`, `LEAD`, `NTILE`, `FIRST_VALUE`, `LAST_VALUE`
 - `CASE WHEN`, `COALESCE`, `NULLIF`, `CAST`
 - Standard aggregate functions: `COUNT`, `SUM`, `AVG`, `MIN`, `MAX`, `STDDEV`, `VAR`
-- CTEs with `WITH ... AS (...)` (but NOT `WITH RECURSIVE`)
+- CTEs with `WITH ... AS (...)`, including `WITH RECURSIVE`
 - Subqueries (correlated and non-correlated)
 - `LIKE`, `IN`, `BETWEEN`, `EXISTS`, `IS NULL`
 - Standard math: `ROUND`, `ABS`, `CEIL`, `FLOOR`, `MOD`, `POWER`, `SQRT`, `LOG`, `EXP`
@@ -28,7 +28,7 @@ These PostgreSQL features work in Kinetica without modification:
 4. **NEVER use backticks** — only ANSI double quotes (`"`) for identifiers.
 5. **ALWAYS fully-qualify table names** — `"schema"."table"` format.
 6. **ST_DISTANCE takes exactly 3 arguments** — `ST_DISTANCE(geom1, geom2, solution)`.
-7. **No RECURSIVE CTEs** — `WITH RECURSIVE` is not supported.
+7. **WITH RECURSIVE supported** — use `WITH RECURSIVE cte AS (base UNION ALL recursive) SELECT ...`. No infinite-recursion guard — ensure your recursive query terminates.
 8. **No trailing semicolons** — omit `;` at end of queries.
 9. **Default LIMIT 100** — always append unless user specifies otherwise.
 
@@ -152,13 +152,41 @@ Generate row sequences (no PostgreSQL equivalent):
 SELECT * FROM "table", ITER WHERE ITER.i < 10
 ```
 
-## information_schema
+## Schema Introspection
 
+**information_schema** — standard ANSI catalog:
 ```sql
 SELECT "column_name", "data_type"
 FROM "information_schema"."columns"
 WHERE "table_schema" = 'my_schema' AND "table_name" = 'my_table'
 ```
+
+**ki_catalog** — Kinetica-specific system tables (security-filtered per user):
+
+| Table | Purpose |
+|-------|---------|
+| `ki_catalog.ki_schemas` | All schemas |
+| `ki_catalog.ki_objects` | All tables & views with stats |
+| `ki_catalog.ki_columns` | All columns with types, properties |
+| `ki_catalog.ki_indexes` | Table indexes |
+| `ki_catalog.ki_partitions` | Partition info |
+| `ki_catalog.ki_obj_stat` | Row/byte counts per object |
+| `ki_catalog.ki_tiered_objects` | Tiering info per object |
+| `ki_catalog.ki_query_active_all` | Currently running queries (per rank) |
+| `ki_catalog.ki_query_history` | History of all SQL statements |
+| `ki_catalog.ki_query_span_metrics_all` | Processing metrics per command |
+| `ki_catalog.ki_query_workers` | Worker rank status |
+| `ki_catalog.ki_load_history` | Data load/export/refresh history |
+| `ki_catalog.ki_ingest_file_info` | Files loaded |
+| `ki_catalog.ki_datasources` | All data sources |
+| `ki_catalog.ki_datasinks` | All data sinks |
+| `ki_catalog.ki_users_and_roles` | All users/roles |
+| `ki_catalog.ki_role_members` | Role membership |
+| `ki_catalog.ki_object_permissions` | All granted privileges |
+| `ki_catalog.ki_functions` | All functions (scalar, aggregate, UDF) |
+| `ki_catalog.ki_backup_history` | Backup/restore events |
+| `ki_catalog.ki_periodic_objects` | Materialized views/procedures with schedules |
+| `ki_catalog.ki_kafka_lag_info` | Kafka consumer lag |
 
 ## Self-Correction Checklist
 

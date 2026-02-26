@@ -38,7 +38,7 @@ These replace PostgreSQL's timestamp arithmetic. See core rules for the full lis
 | `REGEXP_LIKE(col, 'pattern' [, 'mode'])` | POSIX regex. `'i'` = case-insensitive. **Use instead of** `~` / `~*` operators |
 | `DIFFERENCE(s1, s2)` | Soundex comparison (0-4, 4=best match) |
 | `EDIT_DISTANCE(s1, s2)` | Levenshtein distance (lower=closer) |
-| `FILTER_BY_STRING(...)` | Specialized string filtering |
+| `FILTER_BY_STRING(...)` | Accelerated string filtering (see below) |
 | `ILIKE` | Case-insensitive LIKE — supported |
 
 ## Aggregate — Kinetica Extensions
@@ -50,6 +50,13 @@ These replace PostgreSQL's timestamp arithmetic. See core rules for the full lis
 | `ARRAY_AGG(col)` | Combine values into array |
 | `ARRAY_AGG_DISTINCT(col)` | Combine unique values into array |
 | `MEAN(col)` | Alias for AVG |
+| `APPROX_COUNT_DISTINCT(expr)` | Approximate count distinct — faster than `COUNT(DISTINCT ...)` |
+| `APPROX_MEDIAN(expr)` | Approximate median (~2% accuracy) |
+| `APPROX_PERCENTILE(expr, p)` | Approximate percentile (p: 0.0–100.0) |
+| `ARG_MAX(agg_expr, ret_expr)` | Value of `ret_expr` where `agg_expr` is maximum |
+| `ARG_MIN(agg_expr, ret_expr)` | Value of `ret_expr` where `agg_expr` is minimum |
+| `FIRST(ret_expr, order_expr)` | Equivalent to ARG_MIN |
+| `LAST(ret_expr, order_expr)` | Equivalent to ARG_MAX |
 
 ## Null Handling — Kinetica Extensions
 
@@ -124,3 +131,21 @@ Kinetica additions:
 - Both `RANGE` and `ROWS` framing supported
 
 **Critical reminder**: Window functions cannot be nested inside aggregate functions. Always use CTEs.
+
+## FILTER_BY_STRING — Accelerated String Filtering
+
+Table function for fast string matching on fixed-width VARCHAR or TEXT_SEARCH columns:
+
+```sql
+SELECT * FROM TABLE(
+    FILTER_BY_STRING(
+        TABLE_NAME => INPUT_TABLE("schema"."table"),
+        COLUMN_NAMES => 'col1,col2',     -- omit for 'search' mode
+        MODE => 'contains',               -- contains|equals|regex|starts_with|search
+        EXPRESSION => 'pattern',
+        OPTIONS => KV_PAIRS(case_sensitive = 'true')
+    )
+)
+```
+
+Modes: `contains` (substring), `equals` (exact), `regex` (POSIX), `starts_with` (prefix), `search` (full-text on TEXT_SEARCH columns — omit COLUMN_NAMES, supports boolean operators and wildcards).

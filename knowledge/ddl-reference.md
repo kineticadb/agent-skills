@@ -238,20 +238,151 @@ REMOTE QUERY 'SELECT * FROM remote_table'
 WITH OPTIONS (DATA SOURCE = 'my_jdbc_source')
 ```
 
+## Credentials
+
+```sql
+CREATE [OR REPLACE] CREDENTIAL "schema"."aws_creds"
+  TYPE = 'aws_access_key',
+  IDENTITY = 'AKIAIOSFODNN7EXAMPLE',
+  SECRET = 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'
+
+ALTER CREDENTIAL "schema"."aws_creds" SET SECRET = 'new_secret'
+DROP CREDENTIAL "schema"."aws_creds"
+SHOW CREDENTIAL *
+```
+
+Credential types: `aws_access_key`, `azure_ad`, `azure_oauth`, `azure_sas`,
+`azure_storage_key`, `confluent`, `docker`, `gcs_service_account_id`,
+`gcs_service_account_keys`, `hdfs`, `jdbc`, `kafka`, `nvidia_api_key`, `openai_api_key`.
+
 ## Data Sources
 
 ```sql
-CREATE DATA SOURCE "schema"."my_s3"
-LOCATION = 's3://my-bucket'
-TYPE = 'S3'
-WITH CONNECTION (
-    IDENTITY = 'access_key_id',
-    SECRET = 'secret_access_key'
-)
-PROPERTIES (REGION = 'us-east-1')
+CREATE [OR REPLACE] [EXTERNAL] DATA SOURCE "schema"."my_s3"
+  LOCATION = 's3://my-bucket/path/'
+  WITH OPTIONS (
+    CREDENTIAL = 'aws_creds',
+    S3_REGION = 'us-east-1'
+  )
+
+-- JDBC data source
+CREATE DATA SOURCE "schema"."pg_source"
+  LOCATION = 'jdbc:postgresql://host:5432/db'
+  WITH OPTIONS (CREDENTIAL = 'pg_creds')
+
+-- Kafka data source
+CREATE DATA SOURCE "schema"."kafka_in"
+  LOCATION = 'kafka://broker1:9092,broker2:9092'
+  WITH OPTIONS (
+    CREDENTIAL = 'kafka_creds',
+    KAFKA_TOPIC_NAME = 'events'
+  )
 ```
 
-Supported types: S3, Azure, GCS, HDFS, JDBC, Kafka
+Locations: `s3://`, `az://` (Azure Blob), `gs://` (GCS), `hdfs://`, `jdbc:`, `kafka://`, `KiFS://`.
+
+```sql
+ALTER DATA SOURCE "schema"."my_s3" SET LOCATION = 's3://new-bucket/'
+DROP DATA SOURCE "schema"."my_s3"
+SHOW DATA SOURCE *
+```
+
+## Data Sinks
+
+```sql
+CREATE [OR REPLACE] [EXTERNAL] DATA SINK "schema"."kafka_out"
+  KAFKA 'broker1:9092'
+  WITH OPTIONS (CREDENTIAL = 'kafka_creds')
+
+-- HTTP webhook sink
+CREATE DATA SINK "schema"."webhook"
+  HTTP 'https://api.example.com/events'
+
+-- GCS sink
+CREATE DATA SINK "schema"."gcs_backup"
+  GCS 'gs://my-bucket/backups/'
+  WITH OPTIONS (CREDENTIAL = 'gcs_creds')
+```
+
+Sink types: `KAFKA`, `HTTP`/`HTTPS`, `TABLE`, `GCS`, `AZURE`, `S3`.
+
+```sql
+DROP DATA SINK "schema"."kafka_out"
+SHOW DATA SINK *
+```
+
+## Streams (Change Data Capture)
+
+Publish table changes to Kafka, webhooks, or local tables:
+
+```sql
+-- Simple CDC stream
+CREATE STREAM "schema"."order_changes"
+  ON TABLE "sales"."orders"
+  REFRESH ON CHANGE
+  WITH OPTIONS (DATASINK_NAME = 'kafka_out')
+
+-- Filtered stream
+CREATE STREAM "schema"."high_value"
+  ON TABLE "sales"."orders"
+  REFRESH ON CHANGE
+  WHERE "amount" > 10000
+  WITH OPTIONS (DATASINK_NAME = 'webhook')
+
+-- Geofence stream (query-based)
+CREATE STREAM "schema"."geofence_alerts"
+  ON QUERY (
+    SELECT * FROM "tracking"."positions" dt
+    LEFT SEMI JOIN "geo"."zones" lt
+    ON STXY_CONTAINSPOINT(lt."geom", dt."x", dt."y")
+  )
+  REFRESH EVERY 30 SECONDS
+  WITH OPTIONS (DATASINK_NAME = 'kafka_out')
+```
+
+```sql
+DROP STREAM "schema"."order_changes"
+SHOW STREAM *
+```
+
+## Backup / Restore
+
+```sql
+-- Create a full backup
+CREATE BACKUP "nightly_backup"
+  DATA SINK = "gcs_backup"
+  TYPE = 'full'
+  OBJECTS (ALL = "sales")   -- entire schema
+  WITH OPTIONS (CHECKSUM = true)
+
+-- Create a full backup of specific objects
+CREATE BACKUP "tables_backup"
+  DATA SINK = "gcs_backup"
+  TYPE = 'full'
+  OBJECTS (TABLE = "sales"."orders", TABLE = "sales"."customers")
+
+-- Incremental backup (after initial CREATE)
+BACKUP "nightly_backup"
+  DATA SINK = "gcs_backup"
+
+-- Differential backup
+BACKUP "nightly_backup"
+  DATA SINK = "gcs_backup"
+  TYPE = 'differential'
+
+-- Restore
+RESTORE BACKUP "nightly_backup"
+  DATA SOURCE "gcs_source"
+  OBJECTS (ALL = "sales")
+
+-- Management
+DROP BACKUP "nightly_backup"
+SHOW BACKUP *
+DESCRIBE BACKUP "nightly_backup"
+```
+
+Backed-up object types: TABLE, ALL (schema), CREDENTIAL, DATA SINK, DATA SOURCE,
+PROCEDURE, ROLE, STREAM, USER, CONTEXT.
 
 ## Schemas
 

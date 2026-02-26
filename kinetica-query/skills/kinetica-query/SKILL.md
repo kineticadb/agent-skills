@@ -54,6 +54,11 @@ Build property graphs from existing tables, query with Cypher, run algorithms
 (shortest path, page rank, TSP). No separate graph database needed.
 See [references/graph-functions.md](references/graph-functions.md) and [references/graph-examples.md](references/graph-examples.md).
 
+### UDFs, Procedures & ML
+User-Defined Functions (Python), scheduled SQL procedures, built-in ML (PREDICT, OUTLIERS),
+and Docker model management.
+See [references/udf-reference.md](references/udf-reference.md).
+
 ## Query Writing Guidelines
 
 1. Always check column names and types before writing SQL — Kinetica is case-sensitive

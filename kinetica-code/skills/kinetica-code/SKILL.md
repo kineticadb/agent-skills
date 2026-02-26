@@ -18,6 +18,9 @@ This skill includes core Kinetica SQL knowledge so you can embed queries in appl
 - See [references/kinetica-core-rules.md](references/kinetica-core-rules.md) — **read this first**
 - See [references/sql-functions.md](references/sql-functions.md) for supported functions
 - See [references/sql-patterns.md](references/sql-patterns.md) for common query patterns
+- See [references/ddl-reference.md](references/ddl-reference.md) for DDL (table creation, data sources, external tables)
+- See [references/dml-reference.md](references/dml-reference.md) for DML (LOAD DATA, EXPORT, upsert)
+- See [references/udf-reference.md](references/udf-reference.md) for UDFs, procedures, Python environments, ML models
 
 ## Python SDK
 

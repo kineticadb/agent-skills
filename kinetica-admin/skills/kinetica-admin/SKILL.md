@@ -18,59 +18,33 @@ This skill includes core Kinetica SQL knowledge for administrative queries.
 
 - See [references/kinetica-core-rules.md](references/kinetica-core-rules.md) — **read this first**
 - See [references/sql-functions.md](references/sql-functions.md) for supported functions
+- See [references/ddl-reference.md](references/ddl-reference.md) for DDL (credentials, data sources, sinks, backup/restore, streams)
+- See [references/dml-reference.md](references/dml-reference.md) for DML (LOAD DATA, EXPORT, upsert)
+- See [references/security-reference.md](references/security-reference.md) for users, roles, grants, row/column security, resource groups
+- See [references/udf-reference.md](references/udf-reference.md) for UDFs, procedures, ML models
 
-## System Tables
+## System Tables (ki_catalog)
 
-Kinetica exposes system state through the `ki_catalog` schema. Key tables:
+Kinetica exposes system state through the `ki_catalog` schema (security-filtered per user).
+See [references/kinetica-core-rules.md](references/kinetica-core-rules.md) for the full table list.
 
-### Cluster Health
+Key tables: `ki_objects` (tables/views), `ki_columns`, `ki_indexes`, `ki_partitions`,
+`ki_obj_stat` (row/byte counts), `ki_tiered_objects`, `ki_query_active_all` (running queries),
+`ki_query_history`, `ki_users_and_roles`, `ki_role_members`, `ki_object_permissions`,
+`ki_datasources`, `ki_datasinks`, `ki_load_history`, `ki_backup_history`.
 
 ```sql
--- Check cluster status
-SELECT * FROM ki_catalog.ki_cluster_status;
-
--- Node health and resource usage
-SELECT node_id, status, ram_used_bytes, ram_total_bytes,
-       gpu_used_bytes, gpu_total_bytes
-FROM ki_catalog.ki_nodes;
-
 -- Active queries
-SELECT query_id, username, status, start_time, sql_text
-FROM ki_catalog.ki_active_queries
-ORDER BY start_time DESC;
-```
+SELECT * FROM "ki_catalog"."ki_query_active_all"
+ORDER BY "start_time" DESC
+LIMIT 20
 
-### Table Information
-
-```sql
--- Table sizes and row counts
-SELECT schema_name, table_name, row_count,
-       compressed_bytes, uncompressed_bytes
-FROM ki_catalog.ki_tables
-ORDER BY compressed_bytes DESC;
-
--- Column details
-SELECT schema_name, table_name, column_name, column_type,
-       is_nullable, is_primary_key
-FROM ki_catalog.ki_columns
-WHERE schema_name = 'my_schema'
-  AND table_name = 'my_table';
-
--- Table partitions
-SELECT * FROM ki_catalog.ki_partitions
-WHERE schema_name = 'my_schema';
-```
-
-### Query History
-
-```sql
--- Recent slow queries (> 5 seconds)
-SELECT query_id, username, sql_text, start_time, end_time,
-       DATEDIFF(MILLISECOND, start_time, end_time) AS duration_ms
-FROM ki_catalog.ki_query_history
-WHERE DATEDIFF(MILLISECOND, start_time, end_time) > 5000
-ORDER BY start_time DESC
-LIMIT 50;
+-- Slow queries (last 24h)
+SELECT * FROM "ki_catalog"."ki_query_history"
+WHERE DATEDIFF('MILLISECOND', "start_time", "end_time") > 5000
+  AND "start_time" >= DATEADD('HOUR', -24, NOW())
+ORDER BY "start_time" DESC
+LIMIT 50
 ```
 
 ## EXPLAIN Plans
@@ -94,65 +68,13 @@ Key things to look for:
 - **Join strategies** — hash joins vs. nested loop joins
 - **GPU vs CPU execution** — GPU-accelerated operations are marked
 
-## Resource Groups
+## Security, Resource Groups & Tier Management
 
-Resource groups control query resource allocation:
+Full syntax for users, roles, GRANT/REVOKE (including row-level and column-level security),
+resource groups, and tier management is in [references/security-reference.md](references/security-reference.md).
 
-```sql
--- View existing resource groups
-SELECT * FROM ki_catalog.ki_resource_groups;
-
--- Create a resource group
-CREATE RESOURCE GROUP analytics_team
-    WITH MAX_CPU_CONCURRENCY = 4,
-         MAX_DATA = '50GB',
-         MAX_SCHEDULING_PRIORITY = 5;
-
--- Assign a user to a resource group
-ALTER USER analyst_user SET RESOURCE GROUP analytics_team;
-
--- Modify a resource group
-ALTER RESOURCE GROUP analytics_team
-    SET MAX_CPU_CONCURRENCY = 8;
-```
-
-## Tier Management
-
-Kinetica uses a tiered storage model (GPU RAM, host RAM, disk):
-
-```sql
--- View tier configuration
-SELECT * FROM ki_catalog.ki_tiers;
-
--- Check table tier placement
-SELECT schema_name, table_name, tier_name, tier_bytes
-FROM ki_catalog.ki_table_tiers
-WHERE schema_name = 'my_schema';
-
--- Move a table to a specific tier
-ALTER TABLE my_schema.my_table
-    SET TIER STRATEGY (
-        ( ( VRAM 1, RAM 1, PERSIST 1 ) )
-    );
-```
-
-## User and Security Management
-
-```sql
--- List users
-SELECT * FROM ki_catalog.ki_users;
-
--- List roles
-SELECT * FROM ki_catalog.ki_roles;
-
--- Grant permissions
-GRANT SELECT ON my_schema.my_table TO analyst_role;
-GRANT ALL ON SCHEMA my_schema TO admin_role;
-
--- Create a user
-CREATE USER new_analyst IDENTIFIED BY 'secure_password';
-GRANT analyst_role TO new_analyst;
-```
+DDL for credentials, data sources, data sinks, backup/restore, and streams is in
+[references/ddl-reference.md](references/ddl-reference.md).
 
 ## Common Diagnostic Patterns
 
