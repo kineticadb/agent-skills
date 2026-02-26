@@ -188,6 +188,15 @@ WHERE "table_schema" = 'my_schema' AND "table_name" = 'my_table'
 | `ki_catalog.ki_periodic_objects` | Materialized views/procedures with schedules |
 | `ki_catalog.ki_kafka_lag_info` | Kafka consumer lag |
 
+## Safety Guidelines
+
+1. **Never execute DROP, DELETE, or TRUNCATE without explicit user confirmation** — always show the statement and ask before running destructive operations
+2. **Require WHERE on DELETE and UPDATE** — refuse to generate unfiltered `DELETE FROM` or `UPDATE` without a `WHERE` clause unless the user explicitly says "delete all" or "update all"
+3. **Prefer non-destructive alternatives** — use `CREATE OR REPLACE` over `DROP` + `CREATE`, use soft deletes (status column) over `DELETE` when the schema supports it
+4. **Never generate GRANT SYSTEM ADMIN or DROP USER** without explicit confirmation — these are high-impact security operations
+5. **Never include real credentials in generated SQL** — use placeholders like `'<your-access-key>'` for secrets in CREATE CREDENTIAL, data source configs, etc.
+6. **Default to read-only** — when a user's intent is ambiguous, generate SELECT queries, not mutations
+
 ## Self-Correction Checklist
 
 1. Any nested aggregates or window-inside-aggregate patterns? → Use CTE
@@ -196,3 +205,4 @@ WHERE "table_schema" = 'my_schema' AND "table_name" = 'my_table'
 4. All identifiers double-quoted and case-correct?
 5. LIMIT applied?
 6. Column names verified against schema?
+7. Any destructive operation (DROP/DELETE/TRUNCATE)? → Confirm with user first
