@@ -1,15 +1,11 @@
 #!/usr/bin/env bash
-# build.sh — Assembles each plugin by copying knowledge files listed in its REFS.
+# build.sh — Copies knowledge files into each skill's references/ directory.
 #
-# For each plugin directory (kinetica-query, kinetica-code, kinetica-admin):
-#   1. Reads the plugin's REFS file (one filename per line)
-#   2. Copies those files from knowledge/ into the plugin's skills/<name>/references/
-#   3. Mirrors each skill into top-level skills/<name>/ for universal platform support
+# For each skill in skills/ (those containing a REFS file):
+#   1. Reads the skill's REFS file (one filename per line)
+#   2. Copies those files from knowledge/ into skills/<name>/references/
 #
-# The top-level skills/ directory follows the Agent Skills open standard
-# (skills.sh, Codex, Cursor, Windsurf, Gemini CLI, etc.).
-# The plugin-specific directories follow Claude Code's plugin format.
-#
+# Each skill ships with only the reference files it needs.
 # Run this after modifying knowledge/, SKILL.md, or any REFS file.
 
 set -euo pipefail
@@ -23,26 +19,26 @@ if [ ! -d "$KNOWLEDGE_DIR" ]; then
     exit 1
 fi
 
-# Clean and recreate top-level skills/ directory
-rm -rf "$SKILLS_DIR"
-mkdir -p "$SKILLS_DIR"
+if [ ! -d "$SKILLS_DIR" ]; then
+    echo "Error: skills/ directory not found at $SKILLS_DIR" >&2
+    exit 1
+fi
 
-# Find all plugin directories (those containing a REFS file)
 built=0
 errors=0
 
-for refs_file in "$SCRIPT_DIR"/*/REFS; do
+for refs_file in "$SKILLS_DIR"/*/REFS; do
     [ -f "$refs_file" ] || continue
 
-    plugin_dir="$(dirname "$refs_file")"
-    plugin_name="$(basename "$plugin_dir")"
-    skill_refs_dir="$plugin_dir/skills/$plugin_name/references"
+    skill_dir="$(dirname "$refs_file")"
+    skill_name="$(basename "$skill_dir")"
+    refs_dir="$skill_dir/references"
 
-    echo "Building $plugin_name..."
+    echo "Building $skill_name..."
 
     # Clean and recreate references directory
-    rm -rf "$skill_refs_dir"
-    mkdir -p "$skill_refs_dir"
+    rm -rf "$refs_dir"
+    mkdir -p "$refs_dir"
 
     # Copy each file listed in REFS
     copied=0
@@ -59,23 +55,16 @@ for refs_file in "$SCRIPT_DIR"/*/REFS; do
             continue
         fi
 
-        cp "$src" "$skill_refs_dir/"
+        cp "$src" "$refs_dir/"
         copied=$((copied + 1))
     done < "$refs_file"
 
-    echo "  Copied $copied reference files to $plugin_name/skills/$plugin_name/references/"
-
-    # Mirror to top-level skills/ directory (universal Agent Skills standard)
-    top_skill_dir="$SKILLS_DIR/$plugin_name"
-    rm -rf "$top_skill_dir"
-    cp -R "$plugin_dir/skills/$plugin_name" "$top_skill_dir"
-    echo "  Mirrored to skills/$plugin_name/"
-
+    echo "  Copied $copied reference files to skills/$skill_name/references/"
     built=$((built + 1))
 done
 
 echo ""
-echo "Done. Built $built plugins + top-level skills/ directory."
+echo "Done. Built $built skills."
 
 if [ "$errors" -gt 0 ]; then
     echo "WARNING: $errors missing reference files. Check output above." >&2
