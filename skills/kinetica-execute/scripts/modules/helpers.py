@@ -58,6 +58,24 @@ def out(obj):
 
 
 # ---------------------------------------------------------------------------
+# HTTP auth helpers
+# ---------------------------------------------------------------------------
+
+def build_auth_headers():
+    """Build HTTP auth headers from environment credentials."""
+    token = env("KINETICA_DB_SKILL_OAUTH_TOKEN")
+    if token:
+        return {"Authorization": f"Bearer {token}"}
+    username = env("KINETICA_DB_SKILL_USER", "")
+    password = env("KINETICA_DB_SKILL_PASS", "")
+    if username:
+        import base64
+        credentials = base64.b64encode(f"{username}:{password}".encode()).decode()
+        return {"Authorization": f"Basic {credentials}"}
+    return {}
+
+
+# ---------------------------------------------------------------------------
 # Kinetica connection
 # ---------------------------------------------------------------------------
 

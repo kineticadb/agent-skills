@@ -949,46 +949,102 @@ resp = db.visualize_image_chart(
 # resp['image_data'] — base64-encoded PNG
 ```
 
-### visualize_image_heatmap
+### WMS — Web Map Service (Heatmap, Class-break, Raster)
+
+The `/wms` endpoint replaces the deprecated `visualize_image_heatmap` and `visualize_image_classbreak` endpoints. It returns raw PNG bytes (not base64).
+
+#### Common WMS Parameters
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `REQUEST` | Yes | Always `GetMap` |
+| `FORMAT` | Yes | `image/png` |
+| `SRS` | Yes | Spatial reference system (e.g. `EPSG:4326`) |
+| `LAYERS` | Yes | Table name |
+| `BBOX` | Yes | `minX,minY,maxX,maxY` |
+| `WIDTH` | No | Image width (default: 800) |
+| `HEIGHT` | No | Image height (default: 600) |
+| `STYLES` | No | Render style: `heatmap`, `cb_raster`, `raster`, etc. |
+| `X_ATTR` | No | X coordinate column name |
+| `Y_ATTR` | No | Y coordinate column name |
+
+#### Style-Specific Parameters
+
+**heatmap:** `VALUE_ATTR`, `BLUR_RADIUS`, `COLORMAP` (jet, hot, viridis, plasma, etc.)
+
+**cb_raster:** `CB_ATTR`, `CB_VALS`, `POINTCOLORS`, `POINTSIZES`, `POINTSHAPES`
 
 #### Node.js
 
 ```javascript
-const resp = await db.visualize_image_heatmap(
-  ['sensor_data'],     // table_names
-  'longitude',         // x_column_name
-  'latitude',          // y_column_name
-  'temperature',       // value_column_name
-  'jet',               // colormap
-  50,                  // blur_radius
-  800, 600,            // width, height
-  -122.5, -122.3,      // min_x, max_x
-  37.7, 37.8,          // min_y, max_y
-  {}
-);
-// resp.image_data = base64 PNG
+// Heatmap via WMS — returns a Buffer (raw PNG)
+const buffer = await db.wms_request({
+  REQUEST: 'GetMap',
+  FORMAT: 'image/png',
+  SRS: 'EPSG:4326',
+  LAYERS: 'sensor_data',
+  BBOX: '-122.5,37.7,-122.3,37.8',
+  WIDTH: 800,
+  HEIGHT: 600,
+  STYLES: 'heatmap',
+  X_ATTR: 'longitude',
+  Y_ATTR: 'latitude',
+  VALUE_ATTR: 'temperature',
+  BLUR_RADIUS: 5,
+  COLORMAP: 'jet',
+});
+require('fs').writeFileSync('heatmap.png', buffer);
+
+// Class-break via WMS
+const buffer = await db.wms_request({
+  REQUEST: 'GetMap',
+  FORMAT: 'image/png',
+  SRS: 'EPSG:4326',
+  LAYERS: 'my_table',
+  BBOX: '-180,-90,180,90',
+  STYLES: 'cb_raster',
+  X_ATTR: 'lon',
+  Y_ATTR: 'lat',
+  CB_ATTR: 'category',
+  CB_VALS: 'A,B,C',
+  POINTCOLORS: 'FF0000,00FF00,0000FF',
+});
 ```
 
 #### Python
 
 ```python
-resp = db.visualize_image_heatmap(
-    table_names=['sensor_data'],
-    x_column_name='longitude',
-    y_column_name='latitude',
-    value_column_name='temperature',
-    colormap='jet',
-    blur_radius=50,
-    width=800, height=600,
-    min_x=-122.5, max_x=-122.3,
-    min_y=37.7, max_y=37.8,
-    options={}
-)
+import urllib.parse
+import urllib.request
+import base64
+
+# Build WMS URL
+params = {
+    'REQUEST': 'GetMap',
+    'FORMAT': 'image/png',
+    'SRS': 'EPSG:4326',
+    'LAYERS': 'sensor_data',
+    'BBOX': '-122.5,37.7,-122.3,37.8',
+    'WIDTH': '800',
+    'HEIGHT': '600',
+    'STYLES': 'heatmap',
+    'X_ATTR': 'longitude',
+    'Y_ATTR': 'latitude',
+    'VALUE_ATTR': 'temperature',
+    'BLUR_RADIUS': '5',
+    'COLORMAP': 'jet',
+}
+url = f"{db.host}/wms?{urllib.parse.urlencode(params)}"
+req = urllib.request.Request(url)
+# Add auth header (Bearer or Basic) as needed
+with urllib.request.urlopen(req) as resp:
+    png_bytes = resp.read()
+
+with open('heatmap.png', 'wb') as f:
+    f.write(png_bytes)
 ```
 
-**Colormaps:** `jet`, `hot`, `gray`, `blues`, `greens`, `reds`, `viridis`, `plasma`
-
-**Response:** Both return `image_data` as a base64-encoded PNG string. Decode and write to a file for display.
+**Response:** Raw PNG bytes (Buffer in Node.js, bytes in Python). Write directly to file — no base64 decoding needed.
 
 ---
 

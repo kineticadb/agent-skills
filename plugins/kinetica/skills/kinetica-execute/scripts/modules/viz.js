@@ -3,7 +3,7 @@
 /**
  * Visualization module for the Kinetica CLI (Node.js).
  *
- * Provides 4 commands: chart, heatmap, isochrone, classbreak.
+ * Provides 5 commands: chart, heatmap, isochrone, classbreak, wms.
  *
  * Each export follows the category module contract:
  *   { fn: async (db, args) => void, desc: string }
@@ -13,18 +13,25 @@ const fs = require('fs');
 const { die, out, parseCsvArg } = require('./helpers');
 
 // ---------------------------------------------------------------------------
-// Image output helper
+// Image output helpers
 // ---------------------------------------------------------------------------
 
 /**
- * Write decoded base64 image to file or report its length.
+ * Write image data to file or report its length.
+ * Auto-detects whether image_data is raw binary (PNG header) or base64-encoded.
  * @param {object} resp - Kinetica API response containing image_data
  * @param {string|undefined} outputPath - File path to write the image to
  */
 function handleImageOutput(resp, outputPath) {
   const imageData = resp.image_data || '';
   if (outputPath) {
-    const decoded = Buffer.from(imageData, 'base64');
+    // Detect raw binary PNG (starts with \x89PNG) vs base64
+    const isRawBinary = imageData.length >= 4 &&
+      imageData.charCodeAt(0) === 0x89 &&
+      imageData.slice(1, 4) === 'PNG';
+    const decoded = isRawBinary
+      ? Buffer.from(imageData, 'binary')
+      : Buffer.from(imageData, 'base64');
     fs.writeFileSync(outputPath, decoded);
     out({
       status: 'ok',
@@ -37,6 +44,72 @@ function handleImageOutput(resp, outputPath) {
       image_data_length: imageData.length,
     });
   }
+}
+
+/**
+ * Write raw binary image data to file or report its size.
+ * Used by WMS-based commands (heatmap, classbreak, wms).
+ * @param {Buffer} buffer - Raw PNG bytes from WMS
+ * @param {string|undefined} outputPath - File path to write the image to
+ */
+function handleBinaryImageOutput(buffer, outputPath) {
+  if (outputPath) {
+    fs.writeFileSync(outputPath, buffer);
+    out({
+      status: 'ok',
+      output: outputPath,
+      size_bytes: buffer.length,
+    });
+  } else {
+    out({
+      status: 'ok',
+      size_bytes: buffer.length,
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// WMS parameter builder
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a flat WMS parameter object with sensible defaults.
+ * @param {object} opts - Structured options
+ * @param {string} opts.table - LAYERS value (table name)
+ * @param {string} [opts.styles] - WMS STYLES value (e.g. 'heatmap', 'cb_raster')
+ * @param {string} [opts.srs='EPSG:4326'] - Spatial reference system
+ * @param {number} [opts.minX=-180] - Bounding box min X
+ * @param {number} [opts.minY=-90] - Bounding box min Y
+ * @param {number} [opts.maxX=180] - Bounding box max X
+ * @param {number} [opts.maxY=90] - Bounding box max Y
+ * @param {number} [opts.width=800] - Image width
+ * @param {number} [opts.height=600] - Image height
+ * @param {string} [opts.xAttr] - X attribute column
+ * @param {string} [opts.yAttr] - Y attribute column
+ * @param {object} [opts.extra={}] - Additional WMS params merged last
+ * @returns {object} Flat WMS parameter dict
+ */
+function buildWmsParams(opts) {
+  const params = {
+    REQUEST: 'GetMap',
+    FORMAT: 'image/png',
+    SRS: opts.srs || 'EPSG:4326',
+    LAYERS: opts.table,
+    BBOX: [
+      opts.minX != null ? opts.minX : -180,
+      opts.minY != null ? opts.minY : -90,
+      opts.maxX != null ? opts.maxX : 180,
+      opts.maxY != null ? opts.maxY : 90,
+    ].join(','),
+    WIDTH: opts.width || 800,
+    HEIGHT: opts.height || 600,
+  };
+
+  if (opts.styles) params.STYLES = opts.styles;
+  if (opts.xAttr) params.X_ATTR = opts.xAttr;
+  if (opts.yAttr) params.Y_ATTR = opts.yAttr;
+
+  return { ...params, ...(opts.extra || {}) };
 }
 
 // ---------------------------------------------------------------------------
@@ -125,7 +198,7 @@ async function cmdChart(db, args) {
 }
 
 // ---------------------------------------------------------------------------
-// heatmap
+// heatmap (WMS-based)
 // ---------------------------------------------------------------------------
 
 async function cmdHeatmap(db, args) {
@@ -133,7 +206,8 @@ async function cmdHeatmap(db, args) {
   if (!tableName) {
     die(
       'Usage: viz heatmap <table> --x-col COL --y-col COL ' +
-        '[--value-col COL] [--min-x N --max-x N --min-y N --max-y N] ' +
+        '[--value-col COL] [--srs EPSG:4326] [--blur-radius 5] [--colormap jet] ' +
+        '[--min-x N --max-x N --min-y N --max-y N] ' +
         '[--width 800] [--height 600] [--output file.png]'
     );
   }
@@ -144,34 +218,33 @@ async function cmdHeatmap(db, args) {
     die('--x-col and --y-col are required');
   }
 
-  const valueCol = args.flags['value-col'] || '';
-  const geometryCol = args.flags['geometry-col'] || '';
-  const minX = parseFloat(args.flags['min-x'] || '-180');
-  const maxX = parseFloat(args.flags['max-x'] || '180');
-  const minY = parseFloat(args.flags['min-y'] || '-90');
-  const maxY = parseFloat(args.flags['max-y'] || '90');
-  const width = parseInt(args.flags.width || '800', 10);
-  const height = parseInt(args.flags.height || '600', 10);
-  const projection = args.flags.projection || 'PLATE_CARREE';
+  const extra = {};
+  const valueCol = args.flags['value-col'];
+  if (valueCol) extra.VALUE_ATTR = valueCol;
 
-  const resp = await db.visualize_image_heatmap(
-    [tableName],
-    xCol,
-    yCol,
-    valueCol,
-    geometryCol,
-    minX,
-    maxX,
-    minY,
-    maxY,
-    width,
-    height,
-    projection,
-    {},
-    {}
-  );
+  const blurRadius = args.flags['blur-radius'];
+  if (blurRadius) extra.BLUR_RADIUS = blurRadius;
 
-  handleImageOutput(resp, args.flags.output);
+  const colormap = args.flags.colormap;
+  if (colormap) extra.COLORMAP = colormap;
+
+  const params = buildWmsParams({
+    table: tableName,
+    styles: 'heatmap',
+    srs: args.flags.srs || 'EPSG:4326',
+    minX: parseFloat(args.flags['min-x'] || '-180'),
+    minY: parseFloat(args.flags['min-y'] || '-90'),
+    maxX: parseFloat(args.flags['max-x'] || '180'),
+    maxY: parseFloat(args.flags['max-y'] || '90'),
+    width: parseInt(args.flags.width || '800', 10),
+    height: parseInt(args.flags.height || '600', 10),
+    xAttr: xCol,
+    yAttr: yCol,
+    extra,
+  });
+
+  const buffer = await db.wms_request(params);
+  handleBinaryImageOutput(buffer, args.flags.output);
 }
 
 // ---------------------------------------------------------------------------
@@ -228,17 +301,73 @@ async function cmdIsochrone(db, args) {
 }
 
 // ---------------------------------------------------------------------------
-// classbreak
+// classbreak (WMS-based)
 // ---------------------------------------------------------------------------
+
+function buildClassbreakParams(config) {
+  const base = buildWmsParams({
+    table: config.table || config.LAYERS,
+    styles: 'cb_raster',
+    srs: config.srs || config.SRS,
+    minX: config.min_x,
+    minY: config.min_y,
+    maxX: config.max_x,
+    maxY: config.max_y,
+    width: config.width || config.WIDTH,
+    height: config.height || config.HEIGHT,
+    xAttr: config.x_attr,
+    yAttr: config.y_attr,
+    extra: config.BBOX ? { BBOX: config.BBOX } : {},
+  });
+
+  if (!base.LAYERS) die('Config must include "LAYERS" or "table"');
+
+  // Pass through uppercase WMS keys not already set
+  const passthrough = {};
+  for (const [key, val] of Object.entries(config)) {
+    if (key === key.toUpperCase() && !base[key]) passthrough[key] = val;
+  }
+  return { ...base, ...passthrough };
+}
 
 async function cmdClassbreak(db, args) {
   const configArg = args.flags.config;
   const config = loadConfig(configArg);
   const outputPath = args.flags.output;
 
-  const resp = await db.visualize_image_classbreak(config);
+  const params = buildClassbreakParams(config);
+  const buffer = await db.wms_request(params);
+  handleBinaryImageOutput(buffer, outputPath);
+}
 
-  handleImageOutput(resp, outputPath);
+// ---------------------------------------------------------------------------
+// wms (general-purpose WMS command)
+// ---------------------------------------------------------------------------
+
+async function cmdWms(db, args) {
+  const configArg = args.flags.config;
+  const config = loadConfig(configArg);
+  const outputPath = args.flags.output;
+
+  // Apply defaults, then merge user config
+  const params = {
+    REQUEST: 'GetMap',
+    FORMAT: 'image/png',
+    SRS: 'EPSG:4326',
+    WIDTH: 800,
+    HEIGHT: 600,
+    ...config,
+  };
+
+  if (!params.LAYERS) {
+    die('Config must include "LAYERS" (table name)');
+  }
+  if (!params.BBOX) {
+    die('Config must include "BBOX" (e.g. "-180,-90,180,90")');
+  }
+
+  const buffer = await db.wms_request(params);
+  handleBinaryImageOutput(buffer, outputPath);
 }
 
 // ---------------------------------------------------------------------------
@@ -252,7 +381,7 @@ module.exports = {
   },
   heatmap: {
     fn: cmdHeatmap,
-    desc: 'Generate a heatmap image from table data',
+    desc: 'Generate a heatmap image via WMS',
   },
   isochrone: {
     fn: cmdIsochrone,
@@ -260,6 +389,10 @@ module.exports = {
   },
   classbreak: {
     fn: cmdClassbreak,
-    desc: 'Generate a class-break visualization from JSON config',
+    desc: 'Generate a class-break visualization via WMS',
+  },
+  wms: {
+    fn: cmdWms,
+    desc: 'Send a custom WMS request and save the image',
   },
 };
