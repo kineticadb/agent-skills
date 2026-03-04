@@ -8,7 +8,7 @@ Knowledge skills that teach AI agents to work with [Kinetica](https://www.kineti
 npx skills add kineticadb/agent-skills
 ```
 
-That's it. The CLI detects your agents and installs all three skills. Claude picks the right one based on what you're doing.
+That's it. The CLI detects your agents and installs all four skills. Claude picks the right one based on what you're doing.
 
 **Claude Code** (marketplace):
 ```
@@ -30,8 +30,9 @@ cp -r skills/kinetica-query .agents/skills/    # Codex, Windsurf, Roo, etc.
 | **kinetica-query** | Data analysts | SQL analytics — geospatial, time-series, vector search, graph, JSON | 14 files |
 | **kinetica-code** | App developers | Python SDK, REST API, data pipelines, embedded SQL | 6 files |
 | **kinetica-admin** | DBAs | System tables, EXPLAIN, resource groups, security, tier management | 6 files |
+| **kinetica-execute** | Interactive ops | CLI for SQL, graph analytics, geospatial, visualization, data import/export, monitoring | 1 file |
 
-All three install together. Each SKILL.md has a `description` field that tells the agent when to activate it — a SQL query question triggers `kinetica-query`, a Python SDK question triggers `kinetica-code`, etc.
+All four install together. Each SKILL.md has a `description` field that tells the agent when to activate it — a SQL query question triggers `kinetica-query`, a Python SDK question triggers `kinetica-code`, an interactive operation triggers `kinetica-execute`, etc.
 
 ## How It Works
 
@@ -54,7 +55,8 @@ agent-skills/
 ├── skills/              # All skills live here
 │   ├── kinetica-query/  #   SKILL.md + REFS + references/
 │   ├── kinetica-code/
-│   └── kinetica-admin/
+│   ├── kinetica-admin/
+│   └── kinetica-execute/
 ├── knowledge/           # Source of truth for all reference files
 ├── .claude-plugin/      # Claude Code marketplace config
 ├── build.sh             # knowledge/ → skills/*/references/

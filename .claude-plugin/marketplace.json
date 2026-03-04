@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "kineticadb-agent-skills",
-  "description": "Kinetica knowledge skills — teaches AI agents to write correct SQL, build applications, and administer Kinetica's GPU-accelerated database.",
+  "description": "Kinetica knowledge skills — teaches AI agents to write correct SQL, build applications, administer, and interactively operate Kinetica's GPU-accelerated database.",
   "owner": {
     "name": "Kinetica",
     "email": "support@kinetica.com"
@@ -13,7 +13,7 @@
   "plugins": [
     {
       "name": "kineticadb-agent-skills",
-      "description": "Kinetica knowledge skills — SQL analytics, application development, and database administration for Kinetica's GPU-accelerated database.",
+      "description": "Kinetica knowledge skills — SQL analytics, application development, database administration, and interactive execution for Kinetica's GPU-accelerated database.",
       "version": "1.0.0",
       "author": {
         "name": "Kinetica"
@@ -21,7 +21,7 @@
       "source": ".",
       "category": "data",
       "homepage": "https://github.com/kineticadb/agent-skills",
-      "keywords": ["database", "sql", "kinetica", "gpu", "analytics", "geospatial", "time-series", "graph", "vector-search", "python", "admin"]
+      "keywords": ["database", "sql", "kinetica", "gpu", "analytics", "geospatial", "time-series", "graph", "vector-search", "python", "admin", "execute", "cli", "nodejs"]
     }
   ]
 }
