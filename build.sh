@@ -66,15 +66,20 @@ done
 
 # Mirror skills into plugins/kinetica/ for Claude Code marketplace
 PLUGIN_DIR="$SCRIPT_DIR/plugins/kinetica/skills"
+GITIGNORE="$SCRIPT_DIR/.gitignore"
 rm -rf "$PLUGIN_DIR"
 mkdir -p "$PLUGIN_DIR"
 
 for skill_dir in "$SKILLS_DIR"/*/; do
     [ -f "$skill_dir/SKILL.md" ] || continue
     skill_name="$(basename "$skill_dir")"
-    cp -R "$skill_dir" "$PLUGIN_DIR/$skill_name"
-    # Remove REFS from the plugin copy (build artifact, not needed at runtime)
-    rm -f "$PLUGIN_DIR/$skill_name/REFS"
+    # Use rsync to skip .gitignore'd files and build/test artifacts
+    rsync -a \
+        --exclude-from="$GITIGNORE" \
+        --exclude="REFS" \
+        --exclude="__tests__/" \
+        --exclude="vitest*.config.js" \
+        "$skill_dir" "$PLUGIN_DIR/$skill_name/"
 done
 
 echo ""
