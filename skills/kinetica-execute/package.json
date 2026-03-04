@@ -4,5 +4,15 @@
   "description": "Dependencies for the kinetica-execute Claude Code skill",
   "dependencies": {
     "@kinetica/gpudb": "7.2.3-1"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.0",
+    "@vitest/coverage-v8": "^3.0.0"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:integration": "vitest run --config vitest.integration.config.js"
   }
 }
