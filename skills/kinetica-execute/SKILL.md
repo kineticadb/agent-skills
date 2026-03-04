@@ -28,6 +28,8 @@ Full database operations skill for **Kinetica GPU database** with dual-runtime s
 
 **Run this flow after Connection Setup completes.** If dependencies are already installed, this completes instantly at step 1.
 
+> **Python version note:** The `gpudb` PyPI package ships pre-built wheels for Python 3.8–3.13 only. If you are running Python 3.14+, use the Node.js runtime instead.
+
 1. **Detect** — Check which runtime is available:
    ```bash
    # Check Node.js SDK
@@ -38,8 +40,13 @@ Full database operations skill for **Kinetica GPU database** with dual-runtime s
    python3 -c "import gpudb" 2>/dev/null && echo "python:ok"
    ```
 2. **Install if missing** — If neither runtime has the SDK installed:
-   - **Node.js**: `cd .claude/skills/kinetica-execute && npm install`
-   - **Python**: `pip install -r .claude/skills/kinetica-execute/requirements.txt` (create a venv first if one doesn't exist: `python3 -m venv .venv && source .venv/bin/activate`)
+   - **Node.js** (recommended — no platform restrictions): `cd .claude/skills/kinetica-execute && npm install`
+   - **Python** (requires Python 3.8–3.13): First verify the Python version is compatible, then install:
+     ```bash
+     python3 -c "import sys; v=sys.version_info; exit(0 if (3,8)<=v[:2]<=(3,13) else 1)" && echo "python:compatible" || echo "python:incompatible — use Node.js runtime"
+     ```
+     If compatible: `pip install -r .claude/skills/kinetica-execute/requirements.txt` (create a venv first if one doesn't exist: `python3 -m venv .venv && source .venv/bin/activate`)
+   - **Both failed**: If Node.js is not installed and Python is 3.14+, inform the user: *"The Python gpudb package requires Python 3.8–3.13. Please install Node.js v16+ to use this skill, or switch to a compatible Python version."*
 3. **Proceed** — Continue with the user's original request
 
 ## Prerequisites
@@ -65,10 +72,10 @@ Shell environment variables take precedence over `.env` values.
 ### Install Dependencies
 
 ```bash
-# Node.js
+# Node.js (recommended — works with any Node.js v16+)
 cd .claude/skills/kinetica-execute && npm install
 
-# Python (use venv — required on macOS/Homebrew)
+# Python (requires Python 3.8–3.13; use venv — required on macOS/Homebrew)
 python3 -m venv .venv && source .venv/bin/activate && pip install -r .claude/skills/kinetica-execute/requirements.txt
 ```
 
@@ -361,6 +368,7 @@ print(resp['column_headers'])
 | `Table does not exist` | Wrong name/schema | Run `show-tables` to list available tables |
 | `Cannot find module '@kinetica/gpudb'` | Node.js deps not installed | Run `cd .claude/skills/kinetica-execute && npm install` |
 | `ModuleNotFoundError: No module named 'gpudb'` | Python deps not installed | Run `pip install -r .claude/skills/kinetica-execute/requirements.txt` |
+| `No matching distribution found for gpudb` | Python version not supported (3.14+) | The `gpudb` package requires Python 3.8–3.13. Use the Node.js runtime instead |
 | `Expression parse error` | Invalid filter syntax | Use SQL-like expressions: `col > value`, `col = 'string'` |
 | `Graph not found` | Wrong graph name | Run `graph show` to list available graphs |
 | `Invalid solver type` | Unsupported solver | Use SHORTEST_PATH, PAGE_RANK, TSP, CENTRALITY, etc. |
