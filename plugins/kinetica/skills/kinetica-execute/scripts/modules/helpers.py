@@ -7,18 +7,12 @@ from pathlib import Path
 
 
 # ---------------------------------------------------------------------------
-# .env loader -- walks up from modules dir to find .env in the project root
+# .env loader -- reads .env from CWD (expected to be project root)
 # ---------------------------------------------------------------------------
 
 def load_env_file():
-    """Load .env from the project root into os.environ.
-
-    Path traversal from modules/:
-        modules -> scripts -> kinetica-execute -> skills -> .claude -> project root
-        = 6 parent hops.
-    """
-    project_root = Path(__file__).resolve().parent.parent.parent.parent.parent.parent
-    env_path = project_root / ".env"
+    """Load .env from the project root (CWD) into os.environ."""
+    env_path = Path.cwd() / ".env"
     if not env_path.is_file():
         return
     with open(env_path) as f:
