@@ -11,14 +11,11 @@ const fs = require('fs');
 const path = require('path');
 
 // ---------------------------------------------------------------------------
-// .env loader -- walks up from modules dir to find .env in the project root
+// .env loader -- reads .env from CWD (expected to be project root)
 // ---------------------------------------------------------------------------
 
 function loadEnvFile() {
-  // modules -> scripts -> kinetica-execute -> skills -> .claude -> project root
-  // = 5 '..' segments
-  const dir = path.resolve(__dirname, '..', '..', '..', '..', '..');
-  const envPath = path.join(dir, '.env');
+  const envPath = path.join(process.cwd(), '.env');
   if (!fs.existsSync(envPath)) return;
   const lines = fs.readFileSync(envPath, 'utf8').split('\n');
   for (const raw of lines) {
