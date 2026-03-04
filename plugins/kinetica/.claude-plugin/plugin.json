@@ -1,5 +1,5 @@
 {
-  "name": "kineticadb-agent-skills",
+  "name": "kineticadb",
   "description": "Kinetica knowledge skills — teaches AI agents to write correct SQL, build applications, administer, and interactively operate Kinetica's GPU-accelerated database.",
   "author": {
     "name": "Kinetica",

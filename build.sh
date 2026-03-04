@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # build.sh — Copies knowledge files into each skill's references/ directory
-# and mirrors skills into kinetica/ for Claude Code marketplace support.
+# and mirrors skills into plugins/kinetica/ for Claude Code marketplace.
 #
 # For each skill in skills/ (those containing a REFS file):
 #   1. Reads the skill's REFS file (one filename per line)
 #   2. Copies those files from knowledge/ into skills/<name>/references/
-#   3. Copies the built skill into kinetica/skills/<name>/ (Claude plugin)
+#   3. Copies the built skill into plugins/kinetica/skills/<name>/
 #
 # Run this after modifying knowledge/, SKILL.md, or any REFS file.
 
@@ -64,8 +64,8 @@ for refs_file in "$SKILLS_DIR"/*/REFS; do
     built=$((built + 1))
 done
 
-# Mirror skills into kinetica/ for Claude Code marketplace
-PLUGIN_DIR="$SCRIPT_DIR/kinetica/skills"
+# Mirror skills into plugins/kinetica/ for Claude Code marketplace
+PLUGIN_DIR="$SCRIPT_DIR/plugins/kinetica/skills"
 rm -rf "$PLUGIN_DIR"
 mkdir -p "$PLUGIN_DIR"
 
