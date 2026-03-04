@@ -157,7 +157,8 @@ async function cmdChart(db, args) {
   if (!tableName) {
     die(
       'Usage: viz chart <table> --x-column COL --y-column COL ' +
-        '[--type line|bar|scatter] [--min-x N --max-x N --min-y N --max-y N] ' +
+        '[--point-color RRGGBB] [--point-size N] [--point-shape circle|square|diamond] ' +
+        '[--min-x N --max-x N --min-y N --max-y N] ' +
         '[--width 800] [--height 600] [--bg-color FFFFFF] [--output file.png]'
     );
   }
@@ -168,7 +169,6 @@ async function cmdChart(db, args) {
     die('--x-column and --y-column are required');
   }
 
-  const chartType = args.flags.type || 'line';
   const minX = parseFloat(args.flags['min-x'] || '0');
   const maxX = parseFloat(args.flags['max-x'] || '0');
   const minY = parseFloat(args.flags['min-y'] || '0');
@@ -177,7 +177,10 @@ async function cmdChart(db, args) {
   const height = parseInt(args.flags.height || '600', 10);
   const bgColor = args.flags['bg-color'] || 'FFFFFF';
 
-  const styleOptions = { chart_type: chartType };
+  const styleOptions = {};
+  if (args.flags['point-color']) styleOptions.pointcolor = [args.flags['point-color']];
+  if (args.flags['point-size']) styleOptions.pointsize = [args.flags['point-size']];
+  if (args.flags['point-shape']) styleOptions.pointshape = [args.flags['point-shape']];
 
   const resp = await db.visualize_image_chart(
     tableName,

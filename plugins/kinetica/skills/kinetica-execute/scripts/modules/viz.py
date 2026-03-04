@@ -15,16 +15,6 @@ import urllib.request
 from modules.helpers import build_auth_headers, check_status, die, env, out
 
 
-CHART_TYPES = [
-    "line",
-    "bar",
-    "scatter",
-    "area",
-    "stacked_bar",
-    "stacked_area",
-]
-
-
 # ---------------------------------------------------------------------------
 # Image output helpers
 # ---------------------------------------------------------------------------
@@ -195,9 +185,12 @@ def _build_chart_args(parser):
         "--y-column", dest="y_column", required=True,
         help="Column name for the Y axis",
     )
+    parser.add_argument("--point-color", dest="point_color", default=None, help="Point color hex (default: 0000FF)")
+    parser.add_argument("--point-size", dest="point_size", default=None, help="Point size in pixels (default: 3)")
     parser.add_argument(
-        "--type", dest="chart_type", default="line", choices=CHART_TYPES,
-        help="Chart type (default: line)",
+        "--point-shape", dest="point_shape", default=None,
+        choices=["none", "circle", "square", "diamond", "hollowcircle", "hollowsquare", "hollowdiamond"],
+        help="Point shape (default: square)",
     )
     parser.add_argument("--min-x", dest="min_x", type=float, default=0, help="Minimum X value")
     parser.add_argument("--max-x", dest="max_x", type=float, default=0, help="Maximum X value")
@@ -210,14 +203,18 @@ def _build_chart_args(parser):
 
 
 def cmd_chart(db, args):
-    """Generate a chart image from table data."""
+    """Generate a scatter chart image from table data."""
     table_name = args.table_name
     if not table_name:
         die("Usage: viz chart <table> --x-column COL --y-column COL [options]")
 
-    style_options = {
-        "chart_type": args.chart_type,
-    }
+    style_options = {}
+    if args.point_color:
+        style_options["pointcolor"] = [args.point_color]
+    if args.point_size:
+        style_options["pointsize"] = [args.point_size]
+    if args.point_shape:
+        style_options["pointshape"] = [args.point_shape]
 
     resp = db.visualize_image_chart(
         table_name=table_name,

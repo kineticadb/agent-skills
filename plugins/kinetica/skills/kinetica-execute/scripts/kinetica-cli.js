@@ -60,6 +60,19 @@ function printHelp() {
 }
 
 // ---------------------------------------------------------------------------
+// Shared error handler for command dispatch
+// ---------------------------------------------------------------------------
+
+async function runHandler(fn, db, args) {
+  try {
+    await fn(db, args);
+  } catch (err) {
+    out({ error: err.message || String(err) });
+    process.exit(1);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -104,12 +117,7 @@ async function main() {
 
     const args = parseArgs(rest);
     const db = connect();
-    try {
-      await entry.fn(db, args);
-    } catch (err) {
-      out({ error: err.message || String(err) });
-      process.exit(1);
-    }
+    await runHandler(entry.fn, db, args);
     return;
   }
 
@@ -119,12 +127,12 @@ async function main() {
   if (!cmd) die(`Unknown command: ${args.cmd}. Run with --help for usage.`);
 
   const db = connect();
-  try {
-    await cmd.fn(db, args);
-  } catch (err) {
-    out({ error: err.message || String(err) });
-    process.exit(1);
-  }
+  await runHandler(cmd.fn, db, args);
 }
 
-main();
+// Auto-run when invoked directly; skip when require()'d by tests
+if (require.main === module) {
+  main();
+}
+
+module.exports = { main };
