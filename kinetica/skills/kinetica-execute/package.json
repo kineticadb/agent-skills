@@ -1,0 +1,8 @@
+{
+  "private": true,
+  "name": "kinetica-execute",
+  "description": "Dependencies for the kinetica-execute Claude Code skill",
+  "dependencies": {
+    "@kinetica/gpudb": "7.2.3-1"
+  }
+}

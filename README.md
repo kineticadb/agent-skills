@@ -52,14 +52,15 @@ skills/kinetica-query/
 
 ```
 agent-skills/
-├── skills/              # All skills live here
+├── skills/              # All skills live here (canonical)
 │   ├── kinetica-query/  #   SKILL.md + REFS + references/
 │   ├── kinetica-code/
 │   ├── kinetica-admin/
 │   └── kinetica-execute/
+├── kinetica/            # Claude Code plugin (mirrored by build.sh)
 ├── knowledge/           # Source of truth for all reference files
 ├── .claude-plugin/      # Claude Code marketplace config
-├── build.sh             # knowledge/ → skills/*/references/
+├── build.sh             # knowledge/ → references/ + Claude plugin mirror
 └── .github/workflows/   # CI: verifies references stay in sync
 ```
 

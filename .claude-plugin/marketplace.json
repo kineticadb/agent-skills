@@ -18,7 +18,7 @@
       "author": {
         "name": "Kinetica"
       },
-      "source": ".",
+      "source": "./kinetica",
       "category": "data",
       "homepage": "https://github.com/kineticadb/agent-skills",
       "keywords": ["database", "sql", "kinetica", "gpu", "analytics", "geospatial", "time-series", "graph", "vector-search", "python", "admin", "execute", "cli", "nodejs"]
