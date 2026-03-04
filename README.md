@@ -13,7 +13,7 @@ That's it. The CLI detects your agents and installs all four skills. Claude pick
 **Claude Code** (marketplace):
 ```
 /plugin marketplace add kineticadb/agent-skills
-/plugin install kineticadb@kineticadb-agent-skills
+/plugin install kineticadb@kinetica-skills
 ```
 
 **Manual** (any agent):
@@ -69,13 +69,13 @@ agent-skills/
 
 To remove the plugin from Claude Code:
 ```
-/plugin marketplace remove kineticadb-agent-skills
+/plugin marketplace remove kinetica-skills
 ```
 
 **Upgrading from the old 3-plugin format?** If you previously installed `kinetica-query`, `kinetica-code`, or `kinetica-admin` as separate plugins, remove all old data first:
 ```bash
-rm -rf ~/.claude/plugins/cache/kineticadb-agent-skills
-rm -rf ~/.claude/plugins/marketplaces/kineticadb-agent-skills
+rm -rf ~/.claude/plugins/cache/kinetica-skills
+rm -rf ~/.claude/plugins/marketplaces/kinetica-skills
 rm -rf ~/.claude/plugins/cache/kineticadb-agent-skills
 rm -rf ~/.claude/plugins/marketplaces/kineticadb-agent-skills
 ```
@@ -83,7 +83,7 @@ rm -rf ~/.claude/plugins/marketplaces/kineticadb-agent-skills
 Then install fresh:
 ```
 /plugin marketplace add kineticadb/agent-skills
-/plugin install kineticadb@kineticadb-agent-skills
+/plugin install kineticadb@kinetica-skills
 ```
 
 ## Contributing
