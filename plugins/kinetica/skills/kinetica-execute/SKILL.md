@@ -169,22 +169,13 @@ python3 <project>/.claude/skills/kinetica-execute/scripts/kinetica-cli.py <comma
 
 | Command | Args | Description |
 |---------|------|-------------|
-| `viz chart` | `<table> --x-column --y-column --type <bar\|line\|scatter> [--output <file>] [--preview] [--preview-width N]` | Generate a chart image |
-| `viz heatmap` | `<table> --x-col --y-col [--value-col] [--srs EPSG:4326] [--blur-radius N] [--colormap NAME] [--min-x/max-x/min-y/max-y] [--width] [--height] [--output <file>] [--preview] [--preview-width N]` | Generate a heatmap via WMS |
-| `viz isochrone` | `<graph> --source-node <id> --max-cost <val> [--output <file>] [--preview] [--preview-width N]` | Generate isochrone contours |
-| `viz classbreak` | `--config <json_or_@file> [--output <file>] [--preview] [--preview-width N]` | Generate class-break map via WMS |
-| `viz wms` | `--config <json_or_@file> [--output <file>] [--preview] [--preview-width N]` | Send a custom WMS request |
+| `viz chart` | `<table> --x-column --y-column --output <file>` | Generate a chart image |
+| `viz heatmap` | `<table> --x-col --y-col [--value-col] [--srs EPSG:4326] [--blur-radius N] [--colormap NAME] [--min-x/max-x/min-y/max-y] [--width] [--height] --output <file>` | Generate a heatmap via WMS |
+| `viz isochrone` | `<graph> --source <node> --max-radius <val> --output <file>` | Generate isochrone contours |
+| `viz classbreak` | `--config <json_or_@file> --output <file>` | Generate class-break map via WMS |
+| `viz wms` | `--config <json_or_@file> --output <file>` | Send a custom WMS request |
 
-> **Preview flags** (all viz commands):
-> - `--preview` — render an ASCII art preview of the generated image directly in the terminal
-> - `--preview-width N` — max columns for the preview (default: `0` = auto-detect terminal width)
->
-> **IMPORTANT — `--output` and `--preview` are mutually exclusive by default:**
-> - `--preview` only (no `--output`) — when the user asks to "see", "show me", "display", or "preview"
-> - `--output <file>` only (no `--preview`) — when the user asks to "save", "output", or "export"
-> - Both flags together — ONLY if the user explicitly asks to both see AND save in the same request
->
-> **Never pass both flags unless the user explicitly requests both.** When in doubt, use `--preview` alone.
+> **Output:** All viz commands require `--output <file>` to write the image to disk. After the command succeeds, present the absolute file path so the user can open or download the image in their own viewer. Do NOT use `--preview` — terminal ASCII art is not visible in this environment.
 
 ### Monitor Commands
 
@@ -267,22 +258,19 @@ python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py io import-files 
 python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py io kifs-list /data/uploads
 
 # Generate a chart
-python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py viz chart sales --x-column month --y-column revenue --type bar --output chart.png
+python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py viz chart sales --x-column month --y-column revenue --output chart.png
 
-# Preview a heatmap ("show me" → --preview only)
-python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py viz heatmap sensor_data --x-col lon --y-col lat --value-col temperature --colormap jet --preview
-
-# Preview a class-break map ("show me" → --preview only)
-python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py viz classbreak --config '{"LAYERS":"my_table","BBOX":"-180,-90,180,90","CB_ATTR":"category","CB_VALS":"A,B,C","X_ATTR":"lon","Y_ATTR":"lat"}' --preview
-
-# Preview a custom WMS request ("show me" → --preview only)
-python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py viz wms --config '{"LAYERS":"my_table","BBOX":"-122.5,37.7,-122.3,37.8","STYLES":"raster","X_ATTR":"lon","Y_ATTR":"lat"}' --preview
-
-# Save a heatmap to file ("save" → --output only)
+# Generate a heatmap
 python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py viz heatmap sensor_data --x-col lon --y-col lat --value-col temperature --colormap jet --output heatmap.png
 
-# Save a class-break map to file ("export" → --output only)
+# Generate isochrone contours
+python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py viz isochrone my_graph --source 42 --max-radius 300 --output isochrone.png
+
+# Generate a class-break map
 python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py viz classbreak --config '{"LAYERS":"my_table","BBOX":"-180,-90,180,90","CB_ATTR":"category","CB_VALS":"A,B,C","X_ATTR":"lon","Y_ATTR":"lat"}' --output classbreak.png
+
+# Generate a custom WMS map
+python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py viz wms --config '{"LAYERS":"my_table","BBOX":"-122.5,37.7,-122.3,37.8","STYLES":"raster","X_ATTR":"lon","Y_ATTR":"lat"}' --output wms.png
 
 # Create a table monitor for inserts
 python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py monitor create my_table --event insert
