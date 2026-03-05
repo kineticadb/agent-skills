@@ -169,11 +169,17 @@ python3 <project>/.claude/skills/kinetica-execute/scripts/kinetica-cli.py <comma
 
 | Command | Args | Description |
 |---------|------|-------------|
-| `viz chart` | `<table> --x-column --y-column --type <bar\|line\|scatter> --output <file>` | Generate a chart image |
-| `viz heatmap` | `<table> --x-col --y-col [--value-col] [--srs EPSG:4326] [--blur-radius N] [--colormap NAME] [--min-x/max-x/min-y/max-y] [--width] [--height] --output <file>` | Generate a heatmap via WMS |
-| `viz isochrone` | `<graph> --source-node <id> --max-cost <val> --output <file>` | Generate isochrone contours |
-| `viz classbreak` | `--config <json_or_@file> --output <file>` | Generate class-break map via WMS |
-| `viz wms` | `--config <json_or_@file> --output <file>` | Send a custom WMS request |
+| `viz chart` | `<table> --x-column --y-column --type <bar\|line\|scatter> --output <file> [--preview] [--preview-width N]` | Generate a chart image |
+| `viz heatmap` | `<table> --x-col --y-col [--value-col] [--srs EPSG:4326] [--blur-radius N] [--colormap NAME] [--min-x/max-x/min-y/max-y] [--width] [--height] --output <file> [--preview] [--preview-width N]` | Generate a heatmap via WMS |
+| `viz isochrone` | `<graph> --source-node <id> --max-cost <val> --output <file> [--preview] [--preview-width N]` | Generate isochrone contours |
+| `viz classbreak` | `--config <json_or_@file> --output <file> [--preview] [--preview-width N]` | Generate class-break map via WMS |
+| `viz wms` | `--config <json_or_@file> --output <file> [--preview] [--preview-width N]` | Send a custom WMS request |
+
+> **Preview flags** (all viz commands):
+> - `--preview` — render an ASCII art preview of the generated image directly in the terminal
+> - `--preview-width N` — max columns for the preview (default: `0` = auto-detect terminal width)
+>
+> **When to use `--preview`:** Always add `--preview` when the user asks to "see", "show me", "display", or "preview" a visualization. This renders the image inline so the user gets immediate visual feedback without opening a separate file.
 
 ### Monitor Commands
 
@@ -258,8 +264,8 @@ python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py io kifs-list /da
 # Generate a chart
 python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py viz chart sales --x-column month --y-column revenue --type bar --output chart.png
 
-# Generate a heatmap (WMS)
-python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py viz heatmap sensor_data --x-col lon --y-col lat --value-col temperature --colormap jet --output heatmap.png
+# Generate a heatmap with terminal preview
+python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py viz heatmap sensor_data --x-col lon --y-col lat --value-col temperature --colormap jet --output heatmap.png --preview
 
 # Generate a class-break map (WMS)
 python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py viz classbreak --config '{"LAYERS":"my_table","BBOX":"-180,-90,180,90","CB_ATTR":"category","CB_VALS":"A,B,C","X_ATTR":"lon","Y_ATTR":"lat"}' --output classbreak.png
