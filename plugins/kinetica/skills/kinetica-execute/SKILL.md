@@ -169,20 +169,22 @@ python3 <project>/.claude/skills/kinetica-execute/scripts/kinetica-cli.py <comma
 
 | Command | Args | Description |
 |---------|------|-------------|
-| `viz chart` | `<table> --x-column --y-column --type <bar\|line\|scatter> --output <file> [--preview] [--preview-width N]` | Generate a chart image |
-| `viz heatmap` | `<table> --x-col --y-col [--value-col] [--srs EPSG:4326] [--blur-radius N] [--colormap NAME] [--min-x/max-x/min-y/max-y] [--width] [--height] --output <file> [--preview] [--preview-width N]` | Generate a heatmap via WMS |
-| `viz isochrone` | `<graph> --source-node <id> --max-cost <val> --output <file> [--preview] [--preview-width N]` | Generate isochrone contours |
-| `viz classbreak` | `--config <json_or_@file> --output <file> [--preview] [--preview-width N]` | Generate class-break map via WMS |
-| `viz wms` | `--config <json_or_@file> --output <file> [--preview] [--preview-width N]` | Send a custom WMS request |
+| `viz chart` | `<table> --x-column --y-column --type <bar\|line\|scatter> [--output <file>] [--preview] [--preview-width N]` | Generate a chart image |
+| `viz heatmap` | `<table> --x-col --y-col [--value-col] [--srs EPSG:4326] [--blur-radius N] [--colormap NAME] [--min-x/max-x/min-y/max-y] [--width] [--height] [--output <file>] [--preview] [--preview-width N]` | Generate a heatmap via WMS |
+| `viz isochrone` | `<graph> --source-node <id> --max-cost <val> [--output <file>] [--preview] [--preview-width N]` | Generate isochrone contours |
+| `viz classbreak` | `--config <json_or_@file> [--output <file>] [--preview] [--preview-width N]` | Generate class-break map via WMS |
+| `viz wms` | `--config <json_or_@file> [--output <file>] [--preview] [--preview-width N]` | Send a custom WMS request |
 
 > **Preview flags** (all viz commands):
 > - `--preview` — render an ASCII art preview of the generated image directly in the terminal
 > - `--preview-width N` — max columns for the preview (default: `0` = auto-detect terminal width)
 >
-> **Flag selection for viz commands:**
-> - When the user asks to "see", "show me", "display", or "preview" a visualization → use `--preview` only (no `--output`)
-> - When the user asks to "save", "output", or "export" a visualization → use `--output <file>` only (no `--preview`)
-> - Only combine both flags if the user explicitly asks to both see AND save the image
+> **IMPORTANT — `--output` and `--preview` are mutually exclusive by default:**
+> - `--preview` only (no `--output`) — when the user asks to "see", "show me", "display", or "preview"
+> - `--output <file>` only (no `--preview`) — when the user asks to "save", "output", or "export"
+> - Both flags together — ONLY if the user explicitly asks to both see AND save in the same request
+>
+> **Never pass both flags unless the user explicitly requests both.** When in doubt, use `--preview` alone.
 
 ### Monitor Commands
 
