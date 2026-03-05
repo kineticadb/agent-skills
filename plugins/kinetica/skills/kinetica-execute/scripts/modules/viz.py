@@ -13,26 +13,49 @@ import urllib.parse
 import urllib.request
 
 from modules.helpers import build_auth_headers, check_status, die, env, out
+from modules.image_preview import render_preview
+
+
+# ---------------------------------------------------------------------------
+# Preview argument registration
+# ---------------------------------------------------------------------------
+
+def _add_preview_args(parser):
+    """Register --preview and --preview-width arguments on a parser."""
+    parser.add_argument(
+        "--preview", action="store_true", default=False,
+        help="Show ASCII art preview in terminal",
+    )
+    parser.add_argument(
+        "--preview-width", dest="preview_width", type=int, default=0,
+        help="Max columns for preview (default: auto-detect terminal width)",
+    )
 
 
 # ---------------------------------------------------------------------------
 # Image output helpers
 # ---------------------------------------------------------------------------
 
-def _handle_image_output(resp, output_path):
+def _handle_image_output(resp, output_path, preview_width=0):
     """Write image data to file or report its length.
 
     Auto-detects whether image_data is raw binary (PNG header) or base64-encoded.
     """
     image_data = resp.get("image_data", "")
+
+    # Decode image data to bytes for both preview and file output
+    if isinstance(image_data, bytes):
+        decoded = image_data
+    elif len(image_data) >= 4 and image_data[:4] == '\x89PNG':
+        decoded = image_data.encode("latin-1")
+    else:
+        decoded = base64.b64decode(image_data)
+
+    if preview_width:
+        max_w = preview_width if preview_width > 1 else 0
+        render_preview(decoded, max_width=max_w)
+
     if output_path:
-        # Detect raw binary PNG (starts with \x89PNG) vs base64
-        if isinstance(image_data, bytes):
-            decoded = image_data
-        elif len(image_data) >= 4 and image_data[:4] == '\x89PNG':
-            decoded = image_data.encode("latin-1")
-        else:
-            decoded = base64.b64decode(image_data)
         with open(output_path, "wb") as f:
             f.write(decoded)
         out({
@@ -47,11 +70,15 @@ def _handle_image_output(resp, output_path):
         })
 
 
-def _handle_binary_image_output(data, output_path):
+def _handle_binary_image_output(data, output_path, preview_width=0):
     """Write raw binary image data to file or report its size.
 
     Used by WMS-based commands (heatmap, classbreak, wms).
     """
+    if preview_width:
+        max_w = preview_width if preview_width > 1 else 0
+        render_preview(data, max_width=max_w)
+
     if output_path:
         with open(output_path, "wb") as f:
             f.write(data)
@@ -200,6 +227,7 @@ def _build_chart_args(parser):
     parser.add_argument("--height", type=int, default=600, help="Image height in pixels (default: 600)")
     parser.add_argument("--bg-color", dest="bg_color", default="FFFFFF", help="Background color hex (default: FFFFFF)")
     parser.add_argument("--output", default=None, help="Output file path for the image")
+    _add_preview_args(parser)
 
 
 def cmd_chart(db, args):
@@ -231,7 +259,8 @@ def cmd_chart(db, args):
         options={},
     )
     check_status(resp, "visualize_image_chart")
-    _handle_image_output(resp, args.output)
+    preview_width = args.preview_width or (1 if args.preview else 0)
+    _handle_image_output(resp, args.output, preview_width)
 
 
 # ---------------------------------------------------------------------------
@@ -259,6 +288,7 @@ def _build_heatmap_args(parser):
     parser.add_argument("--width", type=int, default=800, help="Image width in pixels (default: 800)")
     parser.add_argument("--height", type=int, default=600, help="Image height in pixels (default: 600)")
     parser.add_argument("--output", default=None, help="Output file path for the image")
+    _add_preview_args(parser)
 
 
 def cmd_heatmap(db, args):
@@ -291,7 +321,8 @@ def cmd_heatmap(db, args):
     })
 
     data = _wms_request(params)
-    _handle_binary_image_output(data, args.output)
+    preview_width = args.preview_width or (1 if args.preview else 0)
+    _handle_binary_image_output(data, args.output, preview_width)
 
 
 # ---------------------------------------------------------------------------
@@ -316,6 +347,7 @@ def _build_isochrone_args(parser):
     )
     parser.add_argument("--levels-table", dest="levels_table", default="", help="Output table name for contour levels")
     parser.add_argument("--output", default=None, help="Output file path for the image")
+    _add_preview_args(parser)
 
 
 def cmd_isochrone(db, args):
@@ -348,7 +380,8 @@ def cmd_isochrone(db, args):
     check_status(resp, "visualize_isochrone")
 
     if generate_image:
-        _handle_image_output(resp, args.output)
+        preview_width = args.preview_width or (1 if args.preview else 0)
+        _handle_image_output(resp, args.output, preview_width)
     else:
         out({
             "status": "ok",
@@ -366,6 +399,7 @@ def _build_classbreak_args(parser):
         help="JSON config: @file.json or inline JSON string",
     )
     parser.add_argument("--output", default=None, help="Output file path for the image")
+    _add_preview_args(parser)
 
 
 def _build_classbreak_params(config):
@@ -411,10 +445,11 @@ def cmd_classbreak(db, args):
     """Generate a class-break visualization via WMS."""
     config = _load_config(args.config)
     output_path = args.output
+    preview_width = args.preview_width or (1 if args.preview else 0)
 
     params = _build_classbreak_params(config)
     data = _wms_request(params)
-    _handle_binary_image_output(data, output_path)
+    _handle_binary_image_output(data, output_path, preview_width)
 
 
 # ---------------------------------------------------------------------------
@@ -427,12 +462,14 @@ def _build_wms_args(parser):
         help="JSON config: @file.json or inline JSON string with WMS params",
     )
     parser.add_argument("--output", default=None, help="Output file path for the image")
+    _add_preview_args(parser)
 
 
 def cmd_wms(db, args):
     """Send a custom WMS request and save the image."""
     config = _load_config(args.config)
     output_path = args.output
+    preview_width = args.preview_width or (1 if args.preview else 0)
 
     # Apply defaults, then merge user config
     params = {
@@ -451,7 +488,7 @@ def cmd_wms(db, args):
         die('Config must include "BBOX" (e.g. "-180,-90,180,90")')
 
     data = _wms_request(params)
-    _handle_binary_image_output(data, output_path)
+    _handle_binary_image_output(data, output_path, preview_width)
 
 
 # ---------------------------------------------------------------------------

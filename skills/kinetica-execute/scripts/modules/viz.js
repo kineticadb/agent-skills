@@ -22,16 +22,23 @@ const { die, out, parseCsvArg } = require('./helpers');
  * @param {object} resp - Kinetica API response containing image_data
  * @param {string|undefined} outputPath - File path to write the image to
  */
-function handleImageOutput(resp, outputPath) {
+function handleImageOutput(resp, outputPath, previewWidth) {
   const imageData = resp.image_data || '';
+
+  // Decode image data to a buffer for both preview and file output
+  const isRawBinary = imageData.length >= 4 &&
+    imageData.charCodeAt(0) === 0x89 &&
+    imageData.slice(1, 4) === 'PNG';
+  const decoded = isRawBinary
+    ? Buffer.from(imageData, 'binary')
+    : Buffer.from(imageData, 'base64');
+
+  if (previewWidth) {
+    const { renderPreview } = require('./image-preview');
+    renderPreview(decoded, { maxWidth: previewWidth > 1 ? previewWidth : 0 });
+  }
+
   if (outputPath) {
-    // Detect raw binary PNG (starts with \x89PNG) vs base64
-    const isRawBinary = imageData.length >= 4 &&
-      imageData.charCodeAt(0) === 0x89 &&
-      imageData.slice(1, 4) === 'PNG';
-    const decoded = isRawBinary
-      ? Buffer.from(imageData, 'binary')
-      : Buffer.from(imageData, 'base64');
     fs.writeFileSync(outputPath, decoded);
     out({
       status: 'ok',
@@ -52,7 +59,12 @@ function handleImageOutput(resp, outputPath) {
  * @param {Buffer} buffer - Raw PNG bytes from WMS
  * @param {string|undefined} outputPath - File path to write the image to
  */
-function handleBinaryImageOutput(buffer, outputPath) {
+function handleBinaryImageOutput(buffer, outputPath, previewWidth) {
+  if (previewWidth) {
+    const { renderPreview } = require('./image-preview');
+    renderPreview(buffer, { maxWidth: previewWidth > 1 ? previewWidth : 0 });
+  }
+
   if (outputPath) {
     fs.writeFileSync(outputPath, buffer);
     out({
@@ -197,7 +209,8 @@ async function cmdChart(db, args) {
     {}
   );
 
-  handleImageOutput(resp, args.flags.output);
+  const previewWidth = args.flags.preview ? parseInt(args.flags['preview-width'] || '0', 10) || true : 0;
+  handleImageOutput(resp, args.flags.output, previewWidth);
 }
 
 // ---------------------------------------------------------------------------
@@ -247,7 +260,8 @@ async function cmdHeatmap(db, args) {
   });
 
   const buffer = await db.wms_request(params);
-  handleBinaryImageOutput(buffer, args.flags.output);
+  const previewWidth = args.flags.preview ? parseInt(args.flags['preview-width'] || '0', 10) || true : 0;
+  handleBinaryImageOutput(buffer, args.flags.output, previewWidth);
 }
 
 // ---------------------------------------------------------------------------
@@ -294,7 +308,8 @@ async function cmdIsochrone(db, args) {
   );
 
   if (generateImage) {
-    handleImageOutput(resp, outputPath);
+    const previewWidth = args.flags.preview ? parseInt(args.flags['preview-width'] || '0', 10) || true : 0;
+    handleImageOutput(resp, outputPath, previewWidth);
   } else {
     out({
       status: 'ok',
@@ -337,10 +352,11 @@ async function cmdClassbreak(db, args) {
   const configArg = args.flags.config;
   const config = loadConfig(configArg);
   const outputPath = args.flags.output;
+  const previewWidth = args.flags.preview ? parseInt(args.flags['preview-width'] || '0', 10) || true : 0;
 
   const params = buildClassbreakParams(config);
   const buffer = await db.wms_request(params);
-  handleBinaryImageOutput(buffer, outputPath);
+  handleBinaryImageOutput(buffer, outputPath, previewWidth);
 }
 
 // ---------------------------------------------------------------------------
@@ -351,6 +367,7 @@ async function cmdWms(db, args) {
   const configArg = args.flags.config;
   const config = loadConfig(configArg);
   const outputPath = args.flags.output;
+  const previewWidth = args.flags.preview ? parseInt(args.flags['preview-width'] || '0', 10) || true : 0;
 
   // Apply defaults, then merge user config
   const params = {
@@ -370,7 +387,7 @@ async function cmdWms(db, args) {
   }
 
   const buffer = await db.wms_request(params);
-  handleBinaryImageOutput(buffer, outputPath);
+  handleBinaryImageOutput(buffer, outputPath, previewWidth);
 }
 
 // ---------------------------------------------------------------------------

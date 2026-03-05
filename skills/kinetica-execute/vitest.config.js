@@ -14,6 +14,7 @@ export default defineConfig({
         'scripts/modules/helpers.js',
         'scripts/modules/core.js',
         'scripts/modules/viz.js',
+        'scripts/modules/image-preview.js',
         'scripts/kinetica-cli.js',
       ],
       thresholds: {

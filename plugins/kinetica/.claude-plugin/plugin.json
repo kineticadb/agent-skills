@@ -1,6 +1,6 @@
 {
   "name": "kineticadb",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Kinetica knowledge skills — teaches AI agents to write correct SQL, build applications, administer, and interactively operate Kinetica's GPU-accelerated database.",
   "author": {
     "name": "Kinetica",

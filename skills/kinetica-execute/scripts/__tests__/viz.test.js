@@ -8,6 +8,7 @@
  */
 
 const fs = require('fs');
+const imagePreview = require('../modules/image-preview');
 const viz = require('../modules/viz');
 
 /** Parse the JSON string passed to console.log */
@@ -593,5 +594,100 @@ describe('wms', () => {
       viz.wms.fn(db, makeArgs([], {}))
     ).rejects.toThrow('process.exit');
     expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// --preview flag integration
+// ---------------------------------------------------------------------------
+
+describe('--preview flag', () => {
+  it('calls renderPreview for heatmap when --preview is set', async () => {
+    const renderSpy = vi.spyOn(imagePreview, 'renderPreview').mockImplementation(() => {});
+    const buf = Buffer.from('fakepng');
+    const db = createMockDb({
+      wms_request: vi.fn().mockResolvedValue(buf),
+    });
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await viz.heatmap.fn(db, makeArgs(['mytable'], {
+      'x-col': 'lon',
+      'y-col': 'lat',
+      preview: true,
+    }));
+
+    expect(renderSpy).toHaveBeenCalledWith(buf, { maxWidth: 0 });
+  });
+
+  it('calls renderPreview for chart when --preview is set', async () => {
+    const renderSpy = vi.spyOn(imagePreview, 'renderPreview').mockImplementation(() => {});
+    const db = createMockDb({
+      visualize_image_chart: vi.fn().mockResolvedValue({
+        image_data: 'aGVsbG8=',
+      }),
+    });
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await viz.chart.fn(db, makeArgs(['mytable'], {
+      'x-column': 'x',
+      'y-column': 'y',
+      preview: true,
+    }));
+
+    expect(renderSpy).toHaveBeenCalledWith(
+      expect.any(Buffer),
+      { maxWidth: 0 },
+    );
+  });
+
+  it('passes preview-width to renderPreview', async () => {
+    const renderSpy = vi.spyOn(imagePreview, 'renderPreview').mockImplementation(() => {});
+    const buf = Buffer.from('fakepng');
+    const db = createMockDb({
+      wms_request: vi.fn().mockResolvedValue(buf),
+    });
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await viz.heatmap.fn(db, makeArgs(['mytable'], {
+      'x-col': 'lon',
+      'y-col': 'lat',
+      preview: true,
+      'preview-width': '40',
+    }));
+
+    expect(renderSpy).toHaveBeenCalledWith(buf, { maxWidth: 40 });
+  });
+
+  it('does not call renderPreview when --preview is not set', async () => {
+    const renderSpy = vi.spyOn(imagePreview, 'renderPreview').mockImplementation(() => {});
+    const buf = Buffer.from('fakepng');
+    const db = createMockDb({
+      wms_request: vi.fn().mockResolvedValue(buf),
+    });
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await viz.heatmap.fn(db, makeArgs(['mytable'], {
+      'x-col': 'lon',
+      'y-col': 'lat',
+    }));
+
+    expect(renderSpy).not.toHaveBeenCalled();
+  });
+
+  it('calls renderPreview for wms when --preview is set', async () => {
+    const renderSpy = vi.spyOn(imagePreview, 'renderPreview').mockImplementation(() => {});
+    const config = JSON.stringify({
+      LAYERS: 'mytable',
+      BBOX: '-180,-90,180,90',
+    });
+    const buf = Buffer.from('wmspng');
+    const db = createMockDb({
+      wms_request: vi.fn().mockResolvedValue(buf),
+    });
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await viz.wms.fn(db, makeArgs([], { config, preview: true }));
+
+    expect(renderSpy).toHaveBeenCalledWith(buf, { maxWidth: 0 });
   });
 });
