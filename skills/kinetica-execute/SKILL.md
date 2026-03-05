@@ -175,7 +175,7 @@ python3 <project>/.claude/skills/kinetica-execute/scripts/kinetica-cli.py <comma
 | `viz classbreak` | `--config <json_or_@file> --output <file>` | Generate class-break map via WMS |
 | `viz wms` | `--config <json_or_@file> --output <file>` | Send a custom WMS request |
 
-> **Output:** All viz commands require `--output <file>` to write the image to disk. After the command succeeds, present the absolute file path so the user can open or download the image in their own viewer. Do NOT use `--preview` — terminal ASCII art is not visible in this environment.
+> **Output:** All viz commands require `--output <file>` to write the image to disk. After the command succeeds, you **MUST** include a clickable file link so the user can view or download the PNG. Use the absolute path and present it as: `[filename.png](file:///absolute/path/to/filename.png)`. If the `--output` value was relative, resolve it against the current working directory. Do NOT use `--preview` — terminal ASCII art is not visible in this environment.
 
 ### Monitor Commands
 
