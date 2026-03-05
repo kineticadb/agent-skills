@@ -10,6 +10,7 @@ import json
 import sys
 
 from modules.helpers import (
+    build_auth_headers,
     check_status,
     columnar_to_rows,
     die,
@@ -186,7 +187,6 @@ def cmd_insert_json(db, args):
         records = [records]
 
     # POST directly to /insert/records/json endpoint
-    import base64
     import urllib.parse
     import urllib.request
 
@@ -199,9 +199,8 @@ def cmd_insert_json(db, args):
         data=json.dumps(records).encode("utf-8"),
         headers={"Content-Type": "application/json"},
     )
-    if hasattr(db, "username") and db.username:
-        auth = base64.b64encode(f"{db.username}:{db.password}".encode()).decode()
-        req.add_header("Authorization", f"Basic {auth}")
+    for key, val in build_auth_headers().items():
+        req.add_header(key, val)
 
     try:
         with urllib.request.urlopen(req) as response:

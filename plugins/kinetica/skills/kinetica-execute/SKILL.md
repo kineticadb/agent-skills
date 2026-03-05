@@ -389,3 +389,67 @@ print(resp['column_headers'])
 | `KiFS directory not found` | Wrong KiFS path | Run `io kifs-list` to browse KiFS |
 | `Import file not found` | Bad file path for import | Verify the file path exists and is accessible |
 | `Monitor not found` | Invalid monitor ID | Run `monitor show` to list active monitors |
+
+## Direct API Access (curl)
+
+The CLI scripts are the preferred way to interact with Kinetica (they handle auth, pagination, and error formatting). However, if you need to call Kinetica's REST API directly via `curl`, follow these rules exactly.
+
+### Authentication
+
+Read credentials from the `.env` file or environment variables set during Connection Setup.
+
+**Basic Auth (username/password):**
+```bash
+# CORRECT — single quotes around -u value (prevents shell expansion of ! $ & etc.)
+curl -X POST -k \
+  -u 'admin:MyP@ss!' \
+  -H "Content-Type: application/json" \
+  "$KINETICA_DB_SKILL_URL/show/table" \
+  -d '{"table_name": "*", "options": {}}'
+
+# WRONG — double quotes corrupt passwords with ! or $ characters
+curl -u "admin:MyP@ss!" ...   # shell interprets ! as history expansion
+```
+
+**OAuth token:**
+```bash
+curl -X POST -k \
+  -H "Authorization: Bearer $KINETICA_DB_SKILL_OAUTH_TOKEN" \
+  -H "Content-Type: application/json" \
+  "$KINETICA_DB_SKILL_URL/show/table" \
+  -d '{"table_name": "*", "options": {}}'
+```
+
+### Required curl flags
+
+| Flag | Why |
+|------|-----|
+| `-X POST` | All Kinetica API endpoints require POST |
+| `-k` (or `--insecure`) | Accept self-signed TLS certs (common in Kinetica deployments) |
+| `-H "Content-Type: application/json"` | Required for all endpoints |
+
+### Common endpoints
+
+| Endpoint | Example body |
+|----------|-------------|
+| `/execute/sql` | `{"statement": "SELECT 1", "offset": 0, "limit": 100, "encoding": "json", "options": {}}` |
+| `/show/table` | `{"table_name": "*", "options": {"get_sizes": "true"}}` |
+| `/show/graph` | `{"graph_name": "*", "options": {}}` |
+| `/insert/records/json?table_name=T` | `[{"col1": "val1"}]` (array of records as body) |
+
+### Example: Execute SQL
+
+```bash
+curl -X POST -k \
+  -u '$KINETICA_DB_SKILL_USER:$KINETICA_DB_SKILL_PASS' \
+  -H "Content-Type: application/json" \
+  "$KINETICA_DB_SKILL_URL/execute/sql" \
+  -d '{"statement": "SELECT * FROM my_table LIMIT 5", "offset": 0, "limit": 100, "encoding": "json", "options": {}}'
+```
+
+### Gotchas
+
+- **Always POST** — GET requests will fail or return unexpected results
+- **Quote passwords with single quotes** — double quotes allow shell expansion of `!`, `$`, backticks
+- **Include `options: {}`** — most endpoints require the options field even if empty
+- **Use the full URL** — include `/_gpudb/` prefix if connecting through a reverse proxy (e.g., `https://host/_gpudb/show/table`)
