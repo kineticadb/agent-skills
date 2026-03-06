@@ -431,11 +431,32 @@ The CLI scripts are the preferred way to interact with Kinetica (they handle aut
 
 ### Authentication
 
-Read credentials from the `.env` file or environment variables set during Connection Setup.
+Read credentials from the `.env` file or environment variables set during Connection Setup. Prefer the `Authorization` header over `-u`.
 
-**Basic Auth (username/password):**
+**OAuth Bearer token (preferred when available):**
 ```bash
-# CORRECT — single quotes around -u value (prevents shell expansion of ! $ & etc.)
+curl -X POST -k \
+  -H "Authorization: Bearer $KINETICA_DB_SKILL_OAUTH_TOKEN" \
+  -H "Content-Type: application/json" \
+  "$KINETICA_DB_SKILL_URL/show/table" \
+  -d '{"table_name": "*", "options": {}}'
+```
+
+**Basic Auth via Authorization header (preferred for username/password):**
+```bash
+# Base64-encode credentials (use printf to avoid trailing newline)
+AUTH=$(printf '%s:%s' "$KINETICA_DB_SKILL_USER" "$KINETICA_DB_SKILL_PASS" | base64)
+
+curl -X POST -k \
+  -H "Authorization: Basic $AUTH" \
+  -H "Content-Type: application/json" \
+  "$KINETICA_DB_SKILL_URL/show/table" \
+  -d '{"table_name": "*", "options": {}}'
+```
+
+**Basic Auth via `-u` (fallback alternative):**
+```bash
+# Single quotes around -u value prevent shell expansion of ! $ & etc.
 curl -X POST -k \
   -u 'admin:MyP@ss!' \
   -H "Content-Type: application/json" \
@@ -444,15 +465,6 @@ curl -X POST -k \
 
 # WRONG — double quotes corrupt passwords with ! or $ characters
 curl -u "admin:MyP@ss!" ...   # shell interprets ! as history expansion
-```
-
-**OAuth token:**
-```bash
-curl -X POST -k \
-  -H "Authorization: Bearer $KINETICA_DB_SKILL_OAUTH_TOKEN" \
-  -H "Content-Type: application/json" \
-  "$KINETICA_DB_SKILL_URL/show/table" \
-  -d '{"table_name": "*", "options": {}}'
 ```
 
 ### Required curl flags
@@ -475,8 +487,10 @@ curl -X POST -k \
 ### Example: Execute SQL
 
 ```bash
+AUTH=$(printf '%s:%s' "$KINETICA_DB_SKILL_USER" "$KINETICA_DB_SKILL_PASS" | base64)
+
 curl -X POST -k \
-  -u '$KINETICA_DB_SKILL_USER:$KINETICA_DB_SKILL_PASS' \
+  -H "Authorization: Basic $AUTH" \
   -H "Content-Type: application/json" \
   "$KINETICA_DB_SKILL_URL/execute/sql" \
   -d '{"statement": "SELECT * FROM my_table LIMIT 5", "offset": 0, "limit": 100, "encoding": "json", "options": {}}'
@@ -485,7 +499,7 @@ curl -X POST -k \
 ### Gotchas
 
 - **Always POST** — GET requests will fail or return unexpected results
-- **Quote passwords with single quotes** — double quotes allow shell expansion of `!`, `$`, backticks
+- **Prefer `Authorization` header over `-u`** — if using `-u` as fallback, quote passwords with single quotes (double quotes allow shell expansion of `!`, `$`, backticks)
 - **Include `options: {}`** — most endpoints require the options field even if empty
 - **Use the full URL** — include `/_gpudb/` prefix if connecting through a reverse proxy (e.g., `https://host/_gpudb/show/table`)
 
