@@ -1,1 +1,15 @@
 api-reference.md
+kinetica-core-rules.md
+sql-functions.md
+sql-patterns.md
+ddl-reference.md
+dml-reference.md
+geospatial-functions.md
+geospatial-examples.md
+timeseries-functions.md
+timeseries-examples.md
+vector-patterns.md
+json-array-text.md
+graph-functions.md
+graph-examples.md
+udf-reference.md
