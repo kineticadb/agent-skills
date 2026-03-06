@@ -10,9 +10,24 @@ user-invocable: true
 
 Full database operations skill for **Kinetica GPU database** with dual-runtime support (Node.js and Python). Execute queries, explore schemas, insert/update/delete data, run graph analytics, apply geospatial filters, generate visualizations, manage imports/exports, monitor tables, or generate reusable code in either language.
 
+## Setup Cache (Fast Path)
+
+**Run this check before anything else.** It avoids redundant interpreter-based dependency detection across sessions by caching setup state in auto-memory.
+
+1. **Read cache** — Check if the auto-memory `MEMORY.md` (already loaded into context) contains a `## Kinetica Setup Cache` section. If not found → skip to **Connection Setup** below
+2. **Validate** — Run a single Bash command to verify the cached state still holds:
+   - If `credentials: dotenv` → include `test -f .env && grep -q KINETICA_DB_SKILL_URL .env`
+   - If `credentials: env-vars` or `credentials: inline` → no credentials file check needed
+   - If `runtime: nodejs` → include `test -f <skill_path>/node_modules/@kinetica/gpudb/package.json` (use the `skill path` value from the cache)
+   - If `runtime: python` and `venv: yes` → include `test -f .venv/bin/activate`
+   - If `runtime: python` and `venv: no` → cannot validate via file check; skip to **Connection Setup** (full detection required)
+   - Chain all applicable checks with `&&` in one command
+3. **Cache hit** (all checks pass) → Skip **Connection Setup**, **Dependency Setup**, and **Runtime Detection** entirely. Use the cached `runtime` value for all CLI commands this session
+4. **Cache miss** (any check fails) → Delete the stale `## Kinetica Setup Cache` section from auto-memory `MEMORY.md`, then proceed to **Connection Setup** below
+
 ## Connection Setup
 
-**Run this flow before the first CLI command in a session.** If credentials are already configured, this completes instantly at step 2.
+**Run this flow before the first CLI command in a session, unless the Setup Cache validated successfully.** If credentials are already configured, this completes instantly at step 2.
 
 1. **Locate** — Use the current working directory as the project root
 2. **Check** — Read shell environment variables first (they take precedence). Then check for a `.env` file in the project root. If `KINETICA_DB_SKILL_URL` is set and non-empty from either source → skip to step 6
@@ -26,7 +41,7 @@ Full database operations skill for **Kinetica GPU database** with dual-runtime s
 
 ## Dependency Setup
 
-**Run this flow after Connection Setup completes.** If dependencies are already installed, this completes instantly at step 1.
+**Run this flow after Connection Setup completes, unless the Setup Cache validated successfully.** If dependencies are already installed, this completes instantly at step 1.
 
 > **Python version note:** The `gpudb` PyPI package ships pre-built wheels for Python 3.8–3.13 only. If you are running Python 3.14+, use the Node.js runtime instead.
 
@@ -48,6 +63,25 @@ Full database operations skill for **Kinetica GPU database** with dual-runtime s
      If compatible: `pip install -r .claude/skills/kinetica-execute/requirements.txt` (create a venv first if one doesn't exist: `python3 -m venv .venv && source .venv/bin/activate`)
    - **Both failed**: If Node.js is not installed and Python is 3.14+, inform the user: *"The Python gpudb package requires Python 3.8–3.13. Please install Node.js v16+ to use this skill, or switch to a compatible Python version."*
 3. **Proceed** — Continue with the user's original request
+
+### Write Setup Cache
+
+After both **Connection Setup** and **Dependency Setup** complete successfully, write (or replace) the `## Kinetica Setup Cache` section in the auto-memory `MEMORY.md` file:
+
+```markdown
+## Kinetica Setup Cache
+- Runtime: <nodejs|python>
+- Skill path: <relative path to .claude/skills/kinetica-execute>
+- Credentials: <dotenv|env-vars|inline>
+- Venv: <yes|no>
+- Cached: <YYYY-MM-DD>
+```
+
+Rules:
+- If `## Kinetica Setup Cache` already exists in `MEMORY.md`, **replace it** (do not duplicate)
+- Only write after setup succeeds — never mid-flow
+- `credentials` value: `dotenv` if `.env` was used, `env-vars` if shell env vars were used, `inline` if env vars are prefixed on each CLI call
+- `venv`: `yes` if `.venv/bin/activate` exists, `no` otherwise
 
 ## Prerequisites
 
@@ -80,6 +114,8 @@ python3 -m venv .venv && source .venv/bin/activate && pip install -r .claude/ski
 ```
 
 ## Runtime Detection
+
+**If the Setup Cache validated successfully, skip this section and use the cached runtime.**
 
 Before running CLI commands, detect which runtime is available:
 
