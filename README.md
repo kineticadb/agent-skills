@@ -27,10 +27,10 @@ cp -r skills/kinetica-query .agents/skills/    # Codex, Windsurf, Roo, etc.
 
 | Skill | Audience | What it teaches | References |
 |-------|----------|-----------------|------------|
-| **kinetica-query** | Data analysts | SQL analytics — geospatial, time-series, vector search, graph, JSON | 14 files |
-| **kinetica-code** | App developers | Python SDK, REST API, data pipelines, embedded SQL | 6 files |
-| **kinetica-admin** | DBAs | System tables, EXPLAIN, resource groups, security, tier management | 6 files |
-| **kinetica-execute** | Interactive ops | CLI for SQL, graph analytics, geospatial, visualization, data import/export, monitoring | 1 file |
+| **kinetica-query** | Data analysts | SQL analytics — geospatial, time-series, vector search, graph, JSON | 15 files |
+| **kinetica-code** | App developers | Python SDK, REST API, data pipelines, embedded SQL | 7 files |
+| **kinetica-admin** | DBAs | System tables, EXPLAIN, resource groups, security, tier management | 7 files |
+| **kinetica-execute** | Interactive ops | CLI for SQL, graph analytics, geospatial, visualization, data import/export, monitoring | 16 files |
 
 All four install together. Each SKILL.md has a `description` field that tells the agent when to activate it — a SQL query question triggers `kinetica-query`, a Python SDK question triggers `kinetica-code`, an interactive operation triggers `kinetica-execute`, etc.
 
