@@ -22,6 +22,7 @@ This skill includes core Kinetica SQL knowledge for administrative queries.
 - See [references/dml-reference.md](references/dml-reference.md) for DML (LOAD DATA, EXPORT, upsert)
 - See [references/security-reference.md](references/security-reference.md) for users, roles, grants, row/column security, resource groups
 - See [references/udf-reference.md](references/udf-reference.md) for UDFs, procedures, ML models
+- See [references/curl-api-reference.md](references/curl-api-reference.md) for direct REST API access via curl
 
 ## System Tables (ki_catalog)
 

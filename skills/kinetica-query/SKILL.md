@@ -59,6 +59,10 @@ User-Defined Functions (Python), scheduled SQL procedures, built-in ML (PREDICT,
 and Docker model management.
 See [references/udf-reference.md](references/udf-reference.md).
 
+### Direct API Access
+For calling Kinetica endpoints directly via `curl` (useful for testing queries outside SQL clients).
+See [references/curl-api-reference.md](references/curl-api-reference.md).
+
 ## Query Writing Guidelines
 
 1. Always check column names and types before writing SQL — Kinetica is case-sensitive

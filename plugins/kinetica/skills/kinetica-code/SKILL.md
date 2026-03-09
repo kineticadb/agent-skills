@@ -21,6 +21,7 @@ This skill includes core Kinetica SQL knowledge so you can embed queries in appl
 - See [references/ddl-reference.md](references/ddl-reference.md) for DDL (table creation, data sources, external tables)
 - See [references/dml-reference.md](references/dml-reference.md) for DML (LOAD DATA, EXPORT, upsert)
 - See [references/udf-reference.md](references/udf-reference.md) for UDFs, procedures, Python environments, ML models
+- See [references/curl-api-reference.md](references/curl-api-reference.md) for direct REST API access via curl
 
 ## Python SDK
 
