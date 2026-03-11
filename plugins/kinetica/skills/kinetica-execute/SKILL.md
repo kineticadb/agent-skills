@@ -15,18 +15,40 @@ When you need to call Kinetica's REST API directly via `curl`, follow these rule
 
 ### Authentication
 
-Read credentials from the `.env` file or environment variables set during Connection Setup. Prefer the `Authorization` header over `-u`.
+Read credentials from the `.env` file or environment variables set during Connection Setup.
 
-**Loading `.env` safely** — do NOT use `source .env`; it corrupts passwords containing `!` `$` or backticks:
+**Loading `.env` safely** — do NOT use `source .env`; it expands `!` `$` and backticks. Read line-by-line instead:
 ```bash
 while IFS= read -r line || [[ -n "$line" ]]; do
   [[ "$line" =~ ^[[:space:]]*# ]] || [[ -z "$line" ]] && continue
-  export "$line"
+  key="${line%%=*}"
+  val="${line#*=}"
+  # Strip matching surrounding quotes (single or double)
+  if [[ "${val:0:1}" == "'" && "${val: -1}" == "'" ]] || \
+     [[ "${val:0:1}" == '"' && "${val: -1}" == '"' ]]; then
+    val="${val:1:${#val}-2}"
+  fi
+  export "$key=$val"
 done < .env
 ```
 
+> **CRITICAL — never paste credentials into Bash commands.** The Bash tool escapes `!` and other
+> characters at the transport layer, corrupting passwords. Always load credentials from the `.env`
+> file using the loader above within the **same** Bash call as the `curl` command.
+
 **OAuth Bearer token (preferred when available):**
 ```bash
+# Load credentials (must be in same Bash call — env vars don't persist)
+while IFS= read -r line || [[ -n "$line" ]]; do
+  [[ "$line" =~ ^[[:space:]]*# ]] || [[ -z "$line" ]] && continue
+  key="${line%%=*}"; val="${line#*=}"
+  if [[ "${val:0:1}" == "'" && "${val: -1}" == "'" ]] || \
+     [[ "${val:0:1}" == '"' && "${val: -1}" == '"' ]]; then
+    val="${val:1:${#val}-2}"
+  fi
+  export "$key=$val"
+done < .env
+
 curl -X POST -k \
   -H "Authorization: Bearer $KINETICA_DB_SKILL_OAUTH_TOKEN" \
   -H "Content-Type: application/json" \
@@ -36,8 +58,17 @@ curl -X POST -k \
 
 **Basic Auth via Authorization header (preferred for username/password):**
 ```bash
-# Base64-encode credentials (set +H disables ! history expansion; printf avoids trailing newline)
-set +H 2>/dev/null
+# Load credentials + base64-encode (must be in same Bash call — env vars don't persist)
+while IFS= read -r line || [[ -n "$line" ]]; do
+  [[ "$line" =~ ^[[:space:]]*# ]] || [[ -z "$line" ]] && continue
+  key="${line%%=*}"; val="${line#*=}"
+  if [[ "${val:0:1}" == "'" && "${val: -1}" == "'" ]] || \
+     [[ "${val:0:1}" == '"' && "${val: -1}" == '"' ]]; then
+    val="${val:1:${#val}-2}"
+  fi
+  export "$key=$val"
+done < .env
+
 AUTH=$(printf '%s:%s' "$KINETICA_DB_SKILL_USER" "$KINETICA_DB_SKILL_PASS" | base64)
 
 curl -X POST -k \
@@ -45,19 +76,6 @@ curl -X POST -k \
   -H "Content-Type: application/json" \
   "$KINETICA_DB_SKILL_URL/show/table" \
   -d '{"table_name": "*", "options": {}}'
-```
-
-**Basic Auth via `-u` (fallback alternative):**
-```bash
-# Single quotes around -u value prevent shell expansion of ! $ & etc.
-curl -X POST -k \
-  -u 'admin:MyP@ss!' \
-  -H "Content-Type: application/json" \
-  "$KINETICA_DB_SKILL_URL/show/table" \
-  -d '{"table_name": "*", "options": {}}'
-
-# WRONG — double quotes corrupt passwords with ! or $ characters
-curl -u "admin:MyP@ss!" ...   # shell interprets ! as history expansion
 ```
 
 ### Required curl flags
@@ -80,7 +98,17 @@ curl -u "admin:MyP@ss!" ...   # shell interprets ! as history expansion
 ### Example: Execute SQL
 
 ```bash
-set +H 2>/dev/null
+# Load credentials + base64-encode (must be in same Bash call — env vars don't persist)
+while IFS= read -r line || [[ -n "$line" ]]; do
+  [[ "$line" =~ ^[[:space:]]*# ]] || [[ -z "$line" ]] && continue
+  key="${line%%=*}"; val="${line#*=}"
+  if [[ "${val:0:1}" == "'" && "${val: -1}" == "'" ]] || \
+     [[ "${val:0:1}" == '"' && "${val: -1}" == '"' ]]; then
+    val="${val:1:${#val}-2}"
+  fi
+  export "$key=$val"
+done < .env
+
 AUTH=$(printf '%s:%s' "$KINETICA_DB_SKILL_USER" "$KINETICA_DB_SKILL_PASS" | base64)
 
 curl -X POST -k \
@@ -142,7 +170,7 @@ curl ... | jq 'if .status == "ERROR" then {error: .message} else (.data_str[0] |
 ### Gotchas
 
 - **Always POST** — GET requests will fail or return unexpected results
-- **Prefer `Authorization` header over `-u`** — if using `-u` as fallback, quote passwords with single quotes (double quotes allow shell expansion of `!`, `$`, backticks)
+- **Never use `-u`** — it requires inlining credentials in the command string, which corrupts `!` and other characters at the Bash tool transport layer
 - **Include `options: {}`** — most endpoints require the options field even if empty
 - **Use the full URL** — include `/_gpudb/` prefix if connecting through a reverse proxy (e.g., `https://host/_gpudb/show/table`)
 - **`data_str` is double-encoded** — the array elements are JSON *strings*, not objects; pipe through `fromjson` in `jq` (or `JSON.parse()` / `json.loads()`) to get the actual payload
