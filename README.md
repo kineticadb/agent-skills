@@ -1,6 +1,6 @@
 # Kinetica Agent Skills
 
-Knowledge skills that teach AI agents to work with [Kinetica](https://www.kinetica.com), a GPU-accelerated database. Works on **17+ platforms** including Claude Code, Cursor, Codex, Windsurf, Gemini CLI, GitHub Copilot, and more.
+Knowledge skills that teach AI agents to work with [Kinetica](https://www.kinetica.com), a real-time and GPU-accelerated database. Works on **17+ platforms** including Claude Code, Cursor, Codex, Windsurf, Gemini CLI, GitHub Copilot, and more.
 
 ## Install
 
