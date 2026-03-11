@@ -16,6 +16,14 @@ When you need to call Kinetica's REST API directly via `curl`, follow these rule
 
 Read credentials from the `.env` file or environment variables set during Connection Setup. Prefer the `Authorization` header over `-u`.
 
+**Loading `.env` safely** — do NOT use `source .env`; it corrupts passwords containing `!` `$` or backticks:
+```bash
+while IFS= read -r line || [[ -n "$line" ]]; do
+  [[ "$line" =~ ^[[:space:]]*# ]] || [[ -z "$line" ]] && continue
+  export "$line"
+done < .env
+```
+
 **OAuth Bearer token (preferred when available):**
 ```bash
 curl -X POST -k \
@@ -27,7 +35,8 @@ curl -X POST -k \
 
 **Basic Auth via Authorization header (preferred for username/password):**
 ```bash
-# Base64-encode credentials (use printf to avoid trailing newline)
+# Base64-encode credentials (set +H disables ! history expansion; printf avoids trailing newline)
+set +H 2>/dev/null
 AUTH=$(printf '%s:%s' "$KINETICA_DB_SKILL_USER" "$KINETICA_DB_SKILL_PASS" | base64)
 
 curl -X POST -k \
@@ -70,6 +79,7 @@ curl -u "admin:MyP@ss!" ...   # shell interprets ! as history expansion
 ### Example: Execute SQL
 
 ```bash
+set +H 2>/dev/null
 AUTH=$(printf '%s:%s' "$KINETICA_DB_SKILL_USER" "$KINETICA_DB_SKILL_PASS" | base64)
 
 curl -X POST -k \
