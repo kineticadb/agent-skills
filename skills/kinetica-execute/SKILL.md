@@ -11,6 +11,8 @@ Full database operations skill for **Kinetica GPU database** with dual-runtime s
 
 ## Kinetica REST API Access (curl)
 
+> **Note:** curl is a session-only fallback — never a cacheable runtime. Use it only when the user explicitly requests raw REST calls, or when neither Node.js nor Python SDK is available. Never save `runtime: curl` in the Setup Cache.
+
 When you need to call Kinetica's REST API directly via `curl`, follow these rules exactly.
 
 ### Authentication
@@ -205,16 +207,41 @@ curl ... | jq 'if .status == "ERROR" then {error: .message} else (.data_str | fr
 
 **Run this check before anything else.** It avoids redundant interpreter-based dependency detection across sessions by caching setup state in auto-memory.
 
-1. **Read cache** — Check if the auto-memory `MEMORY.md` (already loaded into context) contains a `## Kinetica Setup Cache` section. If not found → skip to **Connection Setup** below
-2. **Validate** — Run a single Bash command to verify the cached state still holds:
+1. **Read cache** — Check if the auto-memory `MEMORY.md` (already loaded into context) contains a `## Kinetica Setup Cache` section. If not found → skip to **Skill Path Resolution** below
+2. **Validate** — Run a single Bash command to verify the cached state still holds (use the `Skill path` value from the cache as `<skill_path>`):
    - If `credentials: dotenv` → include `test -f .env && grep -q KINETICA_DB_SKILL_URL .env`
    - If `credentials: env-vars` or `credentials: inline` → no credentials file check needed
-   - If `runtime: nodejs` → include `test -f <skill_path>/node_modules/@kinetica/gpudb/package.json` (use the `skill path` value from the cache)
-   - If `runtime: python` and `venv: yes` → include `test -f .venv/bin/activate`
-   - If `runtime: python` and `venv: no` → cannot validate via file check; skip to **Connection Setup** (full detection required)
+   - If `runtime: nodejs` → include `test -f <skill_path>/scripts/kinetica-cli.js && test -f <skill_path>/node_modules/@kinetica/gpudb/package.json`
+   - If `runtime: python` → include `test -f <skill_path>/scripts/kinetica-cli.py`; if `venv: yes` → also include `test -f .venv/bin/activate`
+   - If `runtime: python` and `venv: no` → cannot validate SDK via file check; skip to **Skill Path Resolution** (full detection required)
    - Chain all applicable checks with `&&` in one command
-3. **Cache hit** (all checks pass) → Skip **Connection Setup**, **Dependency Setup**, and **Runtime Detection** entirely. Use the cached `runtime` value for all CLI commands this session
-4. **Cache miss** (any check fails) → Delete the stale `## Kinetica Setup Cache` section from auto-memory `MEMORY.md`, then proceed to **Connection Setup** below
+3. **Cache hit** (all checks pass) → Skip **Skill Path Resolution**, **Connection Setup**, **Dependency Setup**, and **Runtime Detection** entirely. Use the cached `Skill path` and `runtime` values for all CLI commands this session
+4. **Cache miss** (any check fails) → Delete the stale `## Kinetica Setup Cache` section from auto-memory `MEMORY.md`, then proceed to **Skill Path Resolution** below
+
+## Skill Path Resolution
+
+**Run this once per session before the first CLI invocation (skip if Setup Cache validated — use the cached `Skill path`).**
+
+The skill may be installed locally (project-level) or globally (user-level). Resolve the correct path before invoking any CLI scripts:
+
+```bash
+# Check local first, then global
+if test -f .claude/skills/kinetica-execute/scripts/kinetica-cli.js || \
+   test -f .claude/skills/kinetica-execute/scripts/kinetica-cli.py; then
+  echo "skill_path=.claude/skills/kinetica-execute"
+elif test -f ~/.claude/skills/kinetica-execute/scripts/kinetica-cli.js || \
+     test -f ~/.claude/skills/kinetica-execute/scripts/kinetica-cli.py; then
+  echo "skill_path=$HOME/.claude/skills/kinetica-execute"
+else
+  echo "not_found"
+fi
+```
+
+- **Local found** → use `.claude/skills/kinetica-execute` as `<skill_path>`
+- **Global found** → use the expanded absolute path (e.g., `/Users/you/.claude/skills/kinetica-execute`) as `<skill_path>`
+- **Neither found** → stop and tell the user: *"The kinetica-execute skill scripts were not found in `.claude/` or `~/.claude/`. Please verify the skill is installed."*
+
+**Session caching:** Once resolved, use `<skill_path>` for all subsequent CLI invocations in this session. Do not re-check.
 
 ## Connection Setup
 
@@ -227,7 +254,7 @@ curl ... | jq 'if .status == "ERROR" then {error: .message} else (.data_str | fr
    - **Auth method** — Username/Password or OAuth Token
    - **Credentials** — username + password, or OAuth token, depending on the choice above
 4. **Warn** — Before writing anything, inform the user: *"I'll save these credentials to a local `.env` file (which is gitignored). OK to proceed?"* Use `AskUserQuestion` with Yes/No options. If the user declines, **do not write `.env`** — instead, prefix env vars inline on each CLI call for the remainder of the session (e.g., `KINETICA_DB_SKILL_URL=... python3 ... health`)
-5. **Write** — Create `<project_root>/.env` using the format from `.claude/skills/kinetica-execute/.env.template`, filling in the user-provided values. **Do NOT echo passwords or tokens in your response.** If the write fails (e.g., permission denied), show the user the exact file content they need to create manually (masking secrets with `***`)
+5. **Write** — Create `<project_root>/.env` using the format from `<skill_path>/.env.template`, filling in the user-provided values. **Do NOT echo passwords or tokens in your response.** If the write fails (e.g., permission denied), show the user the exact file content they need to create manually (masking secrets with `***`)
 6. **Proceed** — Continue with the user's original request
 
 ## Dependency Setup
@@ -239,20 +266,21 @@ curl ... | jq 'if .status == "ERROR" then {error: .message} else (.data_str | fr
 1. **Detect** — Check which runtime is available:
    ```bash
    # Check Node.js SDK
-   node -e "process.chdir('.claude/skills/kinetica-execute'); require('@kinetica/gpudb')" 2>/dev/null && echo "nodejs:ok"
+   node -e "process.chdir('<skill_path>'); require('@kinetica/gpudb')" 2>/dev/null && echo "nodejs:ok"
 
    # Check Python SDK (activate venv first if it exists)
    test -f .venv/bin/activate && source .venv/bin/activate
    python3 -c "import gpudb" 2>/dev/null && echo "python:ok"
    ```
 2. **Install if missing** — If neither runtime has the SDK installed:
-   - **Node.js** (recommended — no platform restrictions): `cd .claude/skills/kinetica-execute && npm install`
+   - **Node.js** (recommended — no platform restrictions): `cd <skill_path> && npm install`
    - **Python** (requires Python 3.8–3.13): First verify the Python version is compatible, then install:
      ```bash
      python3 -c "import sys; v=sys.version_info; exit(0 if (3,8)<=v[:2]<=(3,13) else 1)" && echo "python:compatible" || echo "python:incompatible — use Node.js runtime"
      ```
-     If compatible: `pip install -r .claude/skills/kinetica-execute/requirements.txt` (create a venv first if one doesn't exist: `python3 -m venv .venv && source .venv/bin/activate`)
+     If compatible: `pip install -r <skill_path>/requirements.txt` (create a venv first if one doesn't exist: `python3 -m venv .venv && source .venv/bin/activate`)
    - **Both failed**: If Node.js is not installed and Python is 3.14+, inform the user: *"The Python gpudb package requires Python 3.8–3.13. Please install Node.js v16+ to use this skill, or switch to a compatible Python version."*
+   - **curl fallback**: If the user explicitly requests curl, or both SDK runtimes fail and the user cannot install them now, use the **Kinetica REST API Access (curl)** section above for the current session only. **Do not write the Setup Cache** in this case — the next session should re-attempt SDK installation
 3. **Proceed** — Continue with the user's original request
 
 ### Write Setup Cache
@@ -262,7 +290,7 @@ After both **Connection Setup** and **Dependency Setup** complete successfully, 
 ```markdown
 ## Kinetica Setup Cache
 - Runtime: <nodejs|python>
-- Skill path: <relative path to .claude/skills/kinetica-execute>
+- Skill path: <resolved path from Skill Path Resolution — local or global>
 - Credentials: <dotenv|env-vars|inline>
 - Venv: <yes|no>
 - Cached: <YYYY-MM-DD>
@@ -273,6 +301,7 @@ Rules:
 - Only write after setup succeeds — never mid-flow
 - `credentials` value: `dotenv` if `.env` was used, `env-vars` if shell env vars were used, `inline` if env vars are prefixed on each CLI call
 - `venv`: `yes` if `.venv/bin/activate` exists, `no` otherwise
+- **Never cache `curl` as a runtime.** The `Runtime` field only accepts `nodejs` or `python`. If neither SDK is available and the session falls back to raw curl, **do not write the cache** — leave it empty so the next session re-runs full Dependency Setup
 
 ## Prerequisites
 
@@ -298,10 +327,10 @@ Shell environment variables take precedence over `.env` values.
 
 ```bash
 # Node.js (recommended — works with any Node.js v16+)
-cd .claude/skills/kinetica-execute && npm install
+cd <skill_path> && npm install
 
 # Python (requires Python 3.8–3.13; use venv — required on macOS/Homebrew)
-python3 -m venv .venv && source .venv/bin/activate && pip install -r .claude/skills/kinetica-execute/requirements.txt
+python3 -m venv .venv && source .venv/bin/activate && pip install -r <skill_path>/requirements.txt
 ```
 
 ## Runtime Detection
@@ -312,7 +341,7 @@ Before running CLI commands, detect which runtime is available:
 
 ```bash
 # Check Node.js (resolve from skill directory where node_modules/ lives)
-node -e "process.chdir('.claude/skills/kinetica-execute'); require('@kinetica/gpudb')" 2>/dev/null && echo "nodejs:ok"
+node -e "process.chdir('<skill_path>'); require('@kinetica/gpudb')" 2>/dev/null && echo "nodejs:ok"
 
 # Check Python (activate venv first if it exists)
 test -f .venv/bin/activate && source .venv/bin/activate
@@ -332,12 +361,14 @@ Both CLIs share the **same interface** and **same JSON output format**.
 
 ### Invocation
 
+> `<skill_path>` is the path resolved during **Skill Path Resolution** (or from the Setup Cache). Use it for all CLI invocations.
+
 ```bash
 # Node.js
-node <project>/.claude/skills/kinetica-execute/scripts/kinetica-cli.js <command> [args]
+node <skill_path>/scripts/kinetica-cli.js <command> [args]
 
 # Python
-python3 <project>/.claude/skills/kinetica-execute/scripts/kinetica-cli.py <command> [args]
+python3 <skill_path>/scripts/kinetica-cli.py <command> [args]
 ```
 
 ### Commands
@@ -430,80 +461,80 @@ python3 <project>/.claude/skills/kinetica-execute/scripts/kinetica-cli.py <comma
 
 ```bash
 # Health check
-python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py health
+python3 <skill_path>/scripts/kinetica-cli.py health
 
 # Run a SQL query
-python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py query "SELECT * FROM my_schema.my_table LIMIT 10"
+python3 <skill_path>/scripts/kinetica-cli.py query "SELECT * FROM my_schema.my_table LIMIT 10"
 
 # List all tables
-python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py show-tables
+python3 <skill_path>/scripts/kinetica-cli.py show-tables
 
 # List tables in a specific schema
-python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py show-tables my_schema
+python3 <skill_path>/scripts/kinetica-cli.py show-tables my_schema
 
 # Describe table schema
-python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py describe-table my_schema.my_table
+python3 <skill_path>/scripts/kinetica-cli.py describe-table my_schema.my_table
 
 # Get records with filtering
-python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py get-records my_table --limit 50 --expression "status = 'active'" --sort-by created_at --sort-order desc
+python3 <skill_path>/scripts/kinetica-cli.py get-records my_table --limit 50 --expression "status = 'active'" --sort-by created_at --sort-order desc
 
 # Insert JSON records
-python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py insert-json my_table '[{"id": 1, "name": "Alice"}]'
+python3 <skill_path>/scripts/kinetica-cli.py insert-json my_table '[{"id": 1, "name": "Alice"}]'
 
 # Insert from file
-python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py insert-json my_table @data.json
+python3 <skill_path>/scripts/kinetica-cli.py insert-json my_table @data.json
 
 # Delete records
-python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py delete-records my_table "id = 42"
+python3 <skill_path>/scripts/kinetica-cli.py delete-records my_table "id = 42"
 
 # Drop a table
-python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py clear-table my_table
+python3 <skill_path>/scripts/kinetica-cli.py clear-table my_table
 
 # Group-by aggregation
-python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py aggregate my_table "category,count(*),avg(price)"
+python3 <skill_path>/scripts/kinetica-cli.py aggregate my_table "category,count(*),avg(price)"
 ```
 
 ### Category Examples
 
 ```bash
 # Create a graph from edges table
-python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py graph create my_graph --edges "roads.src AS SOURCE, roads.dst AS DESTINATION"
+python3 <skill_path>/scripts/kinetica-cli.py graph create my_graph --edges "roads.src AS SOURCE, roads.dst AS DESTINATION"
 
 # Find shortest path
-python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py graph solve my_graph --solver-type SHORTEST_PATH --source-nodes "node_A" --dest-nodes "node_B"
+python3 <skill_path>/scripts/kinetica-cli.py graph solve my_graph --solver-type SHORTEST_PATH --source-nodes "node_A" --dest-nodes "node_B"
 
 # Filter points within 5km radius
-python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py geo filter-by-radius locations --x-col longitude --y-col latitude --center-x -122.4 --center-y 37.77 --radius 5000
+python3 <skill_path>/scripts/kinetica-cli.py geo filter-by-radius locations --x-col longitude --y-col latitude --center-x -122.4 --center-y 37.77 --radius 5000
 
 # Filter by bounding box
-python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py geo filter-by-box locations --x-col longitude --y-col latitude --min-x -122.5 --max-x -122.3 --min-y 37.7 --max-y 37.8
+python3 <skill_path>/scripts/kinetica-cli.py geo filter-by-box locations --x-col longitude --y-col latitude --min-x -122.5 --max-x -122.3 --min-y 37.7 --max-y 37.8
 
 # Import CSV data
-python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py io import-files my_table --file-path /data/records.csv
+python3 <skill_path>/scripts/kinetica-cli.py io import-files my_table --file-path /data/records.csv
 
 # List KiFS directory contents
-python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py io kifs-list /data/uploads
+python3 <skill_path>/scripts/kinetica-cli.py io kifs-list /data/uploads
 
 # Generate a chart
-python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py viz chart sales --x-column month --y-column revenue --output chart.png
+python3 <skill_path>/scripts/kinetica-cli.py viz chart sales --x-column month --y-column revenue --output chart.png
 
 # Generate a heatmap
-python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py viz heatmap sensor_data --x-col lon --y-col lat --value-col temperature --colormap jet --output heatmap.png
+python3 <skill_path>/scripts/kinetica-cli.py viz heatmap sensor_data --x-col lon --y-col lat --value-col temperature --colormap jet --output heatmap.png
 
 # Generate isochrone contours
-python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py viz isochrone my_graph --source 42 --max-radius 300 --output isochrone.png
+python3 <skill_path>/scripts/kinetica-cli.py viz isochrone my_graph --source 42 --max-radius 300 --output isochrone.png
 
 # Generate a class-break map
-python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py viz classbreak --config '{"LAYERS":"my_table","BBOX":"-180,-90,180,90","CB_ATTR":"category","CB_VALS":"A,B,C","X_ATTR":"lon","Y_ATTR":"lat"}' --output classbreak.png
+python3 <skill_path>/scripts/kinetica-cli.py viz classbreak --config '{"LAYERS":"my_table","BBOX":"-180,-90,180,90","CB_ATTR":"category","CB_VALS":"A,B,C","X_ATTR":"lon","Y_ATTR":"lat"}' --output classbreak.png
 
 # Generate a custom WMS map
-python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py viz wms --config '{"LAYERS":"my_table","BBOX":"-122.5,37.7,-122.3,37.8","STYLES":"raster","X_ATTR":"lon","Y_ATTR":"lat"}' --output wms.png
+python3 <skill_path>/scripts/kinetica-cli.py viz wms --config '{"LAYERS":"my_table","BBOX":"-122.5,37.7,-122.3,37.8","STYLES":"raster","X_ATTR":"lon","Y_ATTR":"lat"}' --output wms.png
 
 # Create a table monitor for inserts
-python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py monitor create my_table --event insert
+python3 <skill_path>/scripts/kinetica-cli.py monitor create my_table --event insert
 
 # Show active monitors
-python3 .claude/skills/kinetica-execute/scripts/kinetica-cli.py monitor show
+python3 <skill_path>/scripts/kinetica-cli.py monitor show
 ```
 
 ## Execute vs. Generate Decision
@@ -538,7 +569,7 @@ Write a Node.js or Python script when the user needs:
 - Bulk KiFS operations (upload/download many files in a loop)
 - Multi-step graph analytics (centrality + shortest path + visualization)
 
-When generating code, read `.claude/skills/kinetica-execute/references/api-reference.md` for API patterns and examples in both languages.
+When generating code, read `<skill_path>/references/api-reference.md` for API patterns and examples in both languages.
 
 ## Output Interpretation
 
@@ -605,8 +636,8 @@ print(resp['column_headers'])
 | `Connection refused` | Server not running | Verify URL and server status |
 | `Authentication failed` | Wrong credentials | Offer to re-run the Connection Setup flow to update credentials, then retry |
 | `Table does not exist` | Wrong name/schema | Run `show-tables` to list available tables |
-| `Cannot find module '@kinetica/gpudb'` | Node.js deps not installed | Run `cd .claude/skills/kinetica-execute && npm install` |
-| `ModuleNotFoundError: No module named 'gpudb'` | Python deps not installed | Run `pip install -r .claude/skills/kinetica-execute/requirements.txt` |
+| `Cannot find module '@kinetica/gpudb'` | Node.js deps not installed | Run `cd <skill_path> && npm install` (use resolved `<skill_path>`) |
+| `ModuleNotFoundError: No module named 'gpudb'` | Python deps not installed | Run `pip install -r <skill_path>/requirements.txt` (use resolved `<skill_path>`) |
 | `No matching distribution found for gpudb` | Python version not supported (3.14+) | The `gpudb` package requires Python 3.8–3.13. Use the Node.js runtime instead |
 | `Expression parse error` | Invalid filter syntax | Use SQL-like expressions: `col > value`, `col = 'string'` |
 | `Graph not found` | Wrong graph name | Run `graph show` to list available graphs |
