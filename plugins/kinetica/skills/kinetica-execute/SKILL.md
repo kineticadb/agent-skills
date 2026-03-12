@@ -158,6 +158,29 @@ curl ... | jq '.data_str | fromjson'
 curl ... | jq '(.data_str | fromjson) as $meta | ($meta.json_encoded_response | fromjson) as $d | {headers: $d.column_headers, rows: $meta.total_number_of_records}'
 ```
 
+**SQL results — row data as arrays** (transpose columnar → rows):
+```bash
+curl ... | jq '
+  (.data_str | fromjson) as $meta
+  | ($meta.json_encoded_response | fromjson) as $d
+  | { headers: $d.column_headers,
+      total:   $meta.total_number_of_records,
+      rows:    [range($d.column_1 | length) as $i
+               | [range($d.column_headers | length) as $j
+                 | $d["column_\($j+1)"][$i]]] }'
+```
+
+**SQL results — rows as named objects** (transpose columnar → row objects):
+```bash
+curl ... | jq '
+  (.data_str | fromjson) as $meta
+  | ($meta.json_encoded_response | fromjson) as $d
+  | [range($d.column_1 | length) as $i
+    | [range($d.column_headers | length) as $j
+      | {key: $d.column_headers[$j], value: $d["column_\($j+1)"][$i]}]
+    | from_entries]'
+```
+
 **Show table — extract table names:**
 ```bash
 curl ... | jq '.data_str | fromjson | .table_names'
