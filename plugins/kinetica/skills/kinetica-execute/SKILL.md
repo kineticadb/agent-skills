@@ -428,7 +428,7 @@ python3 <skill_path>/scripts/kinetica-cli.py <command> [args]
 
 **graph solve --solver-type values:** `SHORTEST_PATH`, `PAGE_RANK`, `PROBABILITY_RANK`, `CENTRALITY`, `MULTIPLE_ROUTING`, `ALLPATHS`, `TSP`, `INVERSE_SHORTEST_PATH`, `BACKHAUL_ROUTING`, `CLOSENESS`
 
-> **Extended timeouts:** Graph CLI commands (`graph create`, `graph solve`, `graph query`, `graph match`) and Cypher/PGQL queries (via `query "GRAPH ... MATCH ..."` or `query "SELECT * FROM TABLE(SOLVE_GRAPH(...))"`) can take significantly longer than standard SQL. When invoking these via the Bash tool, use an extended timeout of **300000–600000 ms** instead of the default 120000 ms.
+> **Extended timeouts:** Graph CLI commands (`graph create`, `graph solve`, `graph query`, `graph match`) and Cypher/PGQL queries (via `query "GRAPH ... MATCH ..."` or `query "SELECT * FROM TABLE(SOLVE_GRAPH(...))"`) can take significantly longer than standard SQL. Set `KINETICA_DB_SKILL_TIMEOUT=300000` (5 min) so the CLI script does not abort the HTTP request early, **and** set the Bash tool timeout to **360000 ms** (6 min) to allow the script to handle its own timeout gracefully before the process is killed. The Bash timeout must always exceed `KINETICA_DB_SKILL_TIMEOUT`.
 
 ### When to Use CLI vs SQL for Graphs
 
