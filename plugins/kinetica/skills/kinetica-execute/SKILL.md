@@ -150,6 +150,20 @@ Response (top level)
         └─ column_3: [10.5, 20.3, 30.1]
 ```
 
+**Parsed response structure (/show/table):**
+```
+Response (top level)
+├─ status: "OK"
+└─ data_str: (JSON string → parse to get metadata)
+    ├─ table_names: ["schema.table1", "schema.table2"]
+    ├─ sizes: [1024, 2048]                              ← already objects
+    ├─ properties: [{...}, {...}]                        ← already objects
+    ├─ additional_info: [{...}, {...}]                   ← already objects
+    └─ type_schemas: ["{"type":"record",...}", ...]      ← double-encoded strings → need fromjson
+```
+
+> **`fromjson` selectivity:** After parsing `data_str`, only `type_schemas` elements (Avro schema strings) need another `fromjson`. Other fields — `table_names`, `properties`, `sizes`, `additional_info` — are already native JSON objects/arrays.
+
 #### Extracting data with `jq`
 
 **Basic — parse `data_str` metadata:**
@@ -190,6 +204,20 @@ curl ... | jq '
 curl ... | jq '.data_str | fromjson | .table_names'
 ```
 
+**Show table — schema inspection (columns + properties):**
+```bash
+curl ... | jq '
+  (.data_str | fromjson) as $d
+  | {
+      table_name: $d.table_names[0],
+      columns:    ($d.type_schemas[0] | fromjson | .fields
+                   | map({name: .name, type: .type})),
+      properties: $d.properties[0]
+    }'
+```
+
+> `type_schemas[0]` gets `fromjson` (double-encoded Avro string); `properties[0]` does NOT (already an object).
+
 **Error checking — guard before parsing:**
 ```bash
 curl ... | jq 'if .status == "ERROR" then {error: .message} else (.data_str | fromjson) end'
@@ -202,6 +230,7 @@ curl ... | jq 'if .status == "ERROR" then {error: .message} else (.data_str | fr
 - **Include `options: {}`** — most endpoints require the options field even if empty
 - **Use the full URL** — include `/_gpudb/` prefix if connecting through a reverse proxy (e.g., `https://host/_gpudb/show/table`)
 - **`data_str` is multi-layered** — the value is a JSON *string* containing metadata; for SQL results, column data is nested inside `json_encoded_response` (another JSON string requiring a second parse)
+- **Not everything inside `data_str` needs `fromjson`** — after parsing `data_str`, only `json_encoded_response` (SQL column data) and `type_schemas` elements (Avro schema strings) are double-encoded strings needing another `fromjson`. Other fields like `properties`, `additional_info`, `sizes`, and `table_names` are already native JSON — applying `fromjson` to them will error
 
 ## Setup Cache (Fast Path)
 
