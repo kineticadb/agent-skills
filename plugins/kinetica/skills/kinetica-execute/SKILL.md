@@ -128,31 +128,34 @@ Every Kinetica REST response shares this envelope structure:
 | `message` | string | Empty on success; error description on failure |
 | `data_type` | string | Schema identifier for the response payload |
 | `data` | object | Binary-encoded payload (usually ignore this) |
-| `data_str` | string | **The actual result** — a JSON-encoded string that must be parsed a second time |
+| `data_str` | string | **Response metadata** — a JSON-encoded string; must be parsed a second time |
 
-> **Key point:** `data_str` is a JSON *string*, not a JSON object. You must parse it a second time (via `fromjson` in jq, `JSON.parse()` in JS, or `json.loads()` in Python) to get usable data.
+> **Key point:** `data_str` is a JSON *string*, not a JSON object. Parse it via `fromjson` in jq (`JSON.parse()` in JS, `json.loads()` in Python). For SQL results, column data is one level deeper inside a `json_encoded_response` field within the parsed `data_str`.
 
-**Example raw response (abbreviated):**
-```json
-{
-  "status": "OK",
-  "message": "",
-  "data_type": "execute_sql_response",
-  "data": {},
-  "data_str": "{\"column_1\":[1,2,3],\"column_headers\":[\"id\",\"name\",\"value\"],\"total_number_of_records\":3}"
-}
+**Parsed response structure (SQL query):**
+```
+Response (top level)
+├─ status: "OK"
+└─ data_str: (JSON string → parse to get metadata)
+    ├─ total_number_of_records: 3
+    ├─ has_more_records: false
+    └─ json_encoded_response: (JSON string → parse to get column data)
+        ├─ column_headers: ["id", "name", "value"]
+        ├─ column_1: [1, 2, 3]
+        ├─ column_2: ["Alice", "Bob", "Carol"]
+        └─ column_3: [10.5, 20.3, 30.1]
 ```
 
 #### Extracting data with `jq`
 
-**Basic — parse `data_str` payload:**
+**Basic — parse `data_str` metadata:**
 ```bash
 curl ... | jq '.data_str | fromjson'
 ```
 
 **SQL results — column headers and row count:**
 ```bash
-curl ... | jq '.data_str | fromjson | {headers: .column_headers, rows: .total_number_of_records}'
+curl ... | jq '(.data_str | fromjson) as $meta | ($meta.json_encoded_response | fromjson) as $d | {headers: $d.column_headers, rows: $meta.total_number_of_records}'
 ```
 
 **Show table — extract table names:**
@@ -171,7 +174,7 @@ curl ... | jq 'if .status == "ERROR" then {error: .message} else (.data_str | fr
 - **Never use `-u`** — it requires inlining credentials in the command string, which corrupts `!` and other characters at the Bash tool transport layer
 - **Include `options: {}`** — most endpoints require the options field even if empty
 - **Use the full URL** — include `/_gpudb/` prefix if connecting through a reverse proxy (e.g., `https://host/_gpudb/show/table`)
-- **`data_str` is double-encoded** — the value is a JSON *string*, not an object; pipe through `fromjson` in `jq` (or `JSON.parse()` / `json.loads()`) to get the actual payload
+- **`data_str` is multi-layered** — the value is a JSON *string* containing metadata; for SQL results, column data is nested inside `json_encoded_response` (another JSON string requiring a second parse)
 
 ## Setup Cache (Fast Path)
 
