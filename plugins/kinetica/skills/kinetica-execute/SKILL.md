@@ -128,9 +128,9 @@ Every Kinetica REST response shares this envelope structure:
 | `message` | string | Empty on success; error description on failure |
 | `data_type` | string | Schema identifier for the response payload |
 | `data` | object | Binary-encoded payload (usually ignore this) |
-| `data_str` | array of strings | **The actual result** — each element is a JSON-encoded string |
+| `data_str` | string | **The actual result** — a JSON-encoded string that must be parsed a second time |
 
-> **Key point:** `data_str` contains JSON *strings*, not JSON objects. You must parse them a second time to get usable data.
+> **Key point:** `data_str` is a JSON *string*, not a JSON object. You must parse it a second time (via `fromjson` in jq, `JSON.parse()` in JS, or `json.loads()` in Python) to get usable data.
 
 **Example raw response (abbreviated):**
 ```json
@@ -139,9 +139,7 @@ Every Kinetica REST response shares this envelope structure:
   "message": "",
   "data_type": "execute_sql_response",
   "data": {},
-  "data_str": [
-    "{\"column_1\":[1,2,3],\"column_headers\":[\"id\",\"name\",\"value\"],\"total_number_of_records\":3}"
-  ]
+  "data_str": "{\"column_1\":[1,2,3],\"column_headers\":[\"id\",\"name\",\"value\"],\"total_number_of_records\":3}"
 }
 ```
 
@@ -149,22 +147,22 @@ Every Kinetica REST response shares this envelope structure:
 
 **Basic — parse `data_str` payload:**
 ```bash
-curl ... | jq '.data_str[0] | fromjson'
+curl ... | jq '.data_str | fromjson'
 ```
 
 **SQL results — column headers and row count:**
 ```bash
-curl ... | jq '.data_str[0] | fromjson | {headers: .column_headers, rows: .total_number_of_records}'
+curl ... | jq '.data_str | fromjson | {headers: .column_headers, rows: .total_number_of_records}'
 ```
 
 **Show table — extract table names:**
 ```bash
-curl ... | jq '.data_str[0] | fromjson | .table_names'
+curl ... | jq '.data_str | fromjson | .table_names'
 ```
 
 **Error checking — guard before parsing:**
 ```bash
-curl ... | jq 'if .status == "ERROR" then {error: .message} else (.data_str[0] | fromjson) end'
+curl ... | jq 'if .status == "ERROR" then {error: .message} else (.data_str | fromjson) end'
 ```
 
 ### Gotchas
@@ -173,7 +171,7 @@ curl ... | jq 'if .status == "ERROR" then {error: .message} else (.data_str[0] |
 - **Never use `-u`** — it requires inlining credentials in the command string, which corrupts `!` and other characters at the Bash tool transport layer
 - **Include `options: {}`** — most endpoints require the options field even if empty
 - **Use the full URL** — include `/_gpudb/` prefix if connecting through a reverse proxy (e.g., `https://host/_gpudb/show/table`)
-- **`data_str` is double-encoded** — the array elements are JSON *strings*, not objects; pipe through `fromjson` in `jq` (or `JSON.parse()` / `json.loads()`) to get the actual payload
+- **`data_str` is double-encoded** — the value is a JSON *string*, not an object; pipe through `fromjson` in `jq` (or `JSON.parse()` / `json.loads()`) to get the actual payload
 
 ## Setup Cache (Fast Path)
 
@@ -195,7 +193,7 @@ curl ... | jq 'if .status == "ERROR" then {error: .message} else (.data_str[0] |
 **Run this flow before the first CLI command in a session, unless the Setup Cache validated successfully.** If credentials are already configured, this completes instantly at step 2.
 
 1. **Locate** — Use the current working directory as the project root
-2. **Check** — Read shell environment variables first (they take precedence). Then check for a `.env` file in the project root. If `KINETICA_DB_SKILL_URL` is set and non-empty from either source → skip to step 6
+2. **Check** — Read shell environment variables first (they take precedence). Then, if a `.env` file exists in the project root, **read it using the Read tool** (this is required so the Write tool can overwrite it later if needed). If `KINETICA_DB_SKILL_URL` is set and non-empty from either source → skip to step 6
 3. **Prompt** — Use `AskUserQuestion` to collect connection details in a single prompt:
    - **Server URL** (required) — e.g., `http://localhost:9191`
    - **Auth method** — Username/Password or OAuth Token
