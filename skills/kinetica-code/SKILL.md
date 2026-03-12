@@ -94,6 +94,8 @@ curl -X POST -k \
 | `/show/graph` | `{"graph_name": "*", "options": {}}` |
 | `/insert/records/json?table_name=T` | `[{"col1": "val1"}]` (array of records as body) |
 
+> **Table name rule:** Always use exact, fully-qualified table names (e.g., `"schema.my_table"`) or `"*"` to list all. **Never** use partial wildcard patterns like `"schema.*table*"` or `"*partial*"`.
+
 ### Example: Execute SQL
 
 ```bash
