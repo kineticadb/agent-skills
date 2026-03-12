@@ -421,12 +421,31 @@ python3 <skill_path>/scripts/kinetica-cli.py <command> [args]
 |---------|------|-------------|
 | `graph create` | `<name> --edges <edge_spec>` | Create a graph from table data |
 | `graph solve` | `<name> --solver-type <type>` | Run solver (SHORTEST_PATH, PAGE_RANK, TSP, etc.) |
-| `graph query` | `<name> --queries <expr>` | Query graph adjacency or reachability |
+| `graph query` | `<name> --queries <node_ids>` | Topological adjacency — find neighbors N hops from given node IDs (NOT for Cypher/PGQL pattern matching) |
 | `graph match` | `<name> --sample-points <table>` | Map-match GPS points to graph edges |
 | `graph delete` | `<name>` | Delete a graph |
 | `graph show` | `[name]` | List graphs or show graph details |
 
-**graph solve --solver-type values:** `SHORTEST_PATH`, `PAGE_RANK`, `CENTRALITY`, `MULTIPLE_ROUTING`, `ALLPATHS`, `TSP`, `INVERSE_SHORTEST_PATH`, `BACKHAUL_ROUTING`, `ISOCHRONE`
+**graph solve --solver-type values:** `SHORTEST_PATH`, `PAGE_RANK`, `PROBABILITY_RANK`, `CENTRALITY`, `MULTIPLE_ROUTING`, `ALLPATHS`, `TSP`, `INVERSE_SHORTEST_PATH`, `BACKHAUL_ROUTING`, `CLOSENESS`
+
+### When to Use CLI vs SQL for Graphs
+
+Graph operations have **two execution paths** — the `graph` CLI commands call REST API endpoints directly, while SQL-based operations run through the `query` command. Choose based on complexity:
+
+| Task | Simple (CLI) | Complex (SQL via `query`) |
+|------|-------------|--------------------------|
+| **Create graph** | `graph create` — basic edges/nodes with flags | `query "CREATE GRAPH ..."` — LABEL_KEY grouping, multi-label `VARCHAR[]`, custom OPTIONS via `KV_PAIRS()` |
+| **Query topology** | `graph query` — find adjacent nodes N hops away by node ID | `query "GRAPH name MATCH (a)-[e]->(b) RETURN ..."` — Cypher pattern matching with labels, attribute filters, variable-length paths |
+| **Run solvers** | `graph solve` — single solver with source/dest nodes | `query "SELECT * FROM TABLE(SOLVE_GRAPH(...))"` — custom options like `uniform_weights`, combined with SQL joins |
+| **Supply-demand** | `graph match` — basic sample points with solve method | `query "EXECUTE FUNCTION MATCH_GRAPH(...)"` — full MSDO with specs, multi-modal transport, geospatial coordinates |
+| **Modify graph** | *(not available)* | `query "ALTER GRAPH ... MODIFY (...)"` — add/remove edges, restrictions, change options |
+| **Inspect/delete** | `graph show` / `graph delete` | *(use CLI — simpler)* |
+
+**Key distinction — `graph query` vs Cypher:**
+- **`graph query <name> --queries <node_ids>`** calls the `/query/graph` REST endpoint — it finds nodes adjacent to the given node identifiers within `--rings` hops. The `--queries` flag takes **node identifiers** (not Cypher syntax).
+- **`query "GRAPH name MATCH ..."`** executes a PGQL/Cypher pattern-matching query as SQL — it supports labels, attribute filters, multi-hop traversal, `GRAPH_TABLE()` aggregation, and query hints. This is the primary way to query graph relationships.
+
+**Rule of thumb:** Use CLI commands for simple, one-shot operations. Use SQL for anything involving labels, attribute filtering, pattern matching, multi-step analytics, or features not exposed by CLI flags.
 
 ### Geospatial Commands
 
@@ -532,6 +551,18 @@ python3 <skill_path>/scripts/kinetica-cli.py graph create my_graph --edges "road
 # Find shortest path
 python3 <skill_path>/scripts/kinetica-cli.py graph solve my_graph --solver-type SHORTEST_PATH --source-nodes "node_A" --dest-nodes "node_B"
 
+# Graph adjacency query (CLI — find neighbors 2 hops away)
+python3 <skill_path>/scripts/kinetica-cli.py graph query my_graph --queries "node_A,node_B" --rings 2
+
+# Cypher pattern matching (executed as SQL via query command)
+python3 <skill_path>/scripts/kinetica-cli.py query "GRAPH wiki_graph MATCH (a:MALE WHERE (node = 'Tom'))<-[b:Friend]-(c) RETURN a.node AS originator, c.node AS friend"
+
+# Cypher with GRAPH_TABLE() for SQL aggregation
+python3 <skill_path>/scripts/kinetica-cli.py query "SELECT person, COUNT(*) AS connections FROM GRAPH_TABLE(GRAPH my_graph MATCH (a)-[e]->(b) RETURN a.node AS person) GROUP BY 1"
+
+# SOLVE_GRAPH via SQL (full options)
+python3 <skill_path>/scripts/kinetica-cli.py query "SELECT * FROM TABLE(SOLVE_GRAPH(GRAPH => 'my_graph', SOLVER_TYPE => 'ALLPATHS', SOURCE_NODES => INPUT_TABLE((SELECT 'nodeA' AS node)), DESTINATION_NODES => INPUT_TABLE((SELECT 'nodeB' AS node)), OPTIONS => KV_PAIRS(uniform_weights = '1')))"
+
 # Filter points within 5km radius
 python3 <skill_path>/scripts/kinetica-cli.py geo filter-by-radius locations --x-col longitude --y-col latitude --center-x -122.4 --center-y 37.77 --radius 5000
 
@@ -577,7 +608,7 @@ Use CLI commands for:
 - Health checks and connection testing
 - One-off aggregations
 - Data exploration and schema discovery
-- Graph inspection (`graph show`) and single-solver runs (`graph solve`)
+- Graph inspection (`graph show`), adjacency queries (`graph query`), single-solver runs (`graph solve`), and simple Cypher queries via `query "GRAPH ... MATCH ..."`
 - Simple geospatial filters (single radius, box, or area query)
 - File imports (`io import-files`) and single-file KiFS operations
 - Quick visualizations (`viz chart`, `viz heatmap`)
@@ -592,11 +623,13 @@ Write a Node.js or Python script when the user needs:
 - Advanced operations (SqlIterator for pagination, bulk loading)
 - Custom error handling or retry logic
 - Integration into existing codebases
-- Complex multi-graph workflows (create graph, solve, then visualize results)
+- Complex multi-graph workflows (create graph with full DDL, solve, then query results)
+- Multi-step graph analytics (centrality + shortest path + Cypher traversal + visualization)
+- MATCH_GRAPH supply-demand optimization with multi-modal transport and spec matching
+- Chained Cypher-to-OLAP pipelines (GRAPH_TABLE aggregation with joins)
 - Chained geospatial-to-visualization pipelines (filter by area, then generate heatmap)
 - Custom monitor callbacks with event processing logic
 - Bulk KiFS operations (upload/download many files in a loop)
-- Multi-step graph analytics (centrality + shortest path + visualization)
 
 When generating code, read `<skill_path>/references/api-reference.md` for API patterns and examples in both languages.
 
