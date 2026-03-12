@@ -633,6 +633,40 @@ Write a Node.js or Python script when the user needs:
 
 When generating code, read `<skill_path>/references/api-reference.md` for API patterns and examples in both languages.
 
+## SQL vs. Cypher Decision Guide
+
+**Before writing any query, check if a graph exists** that covers the data domain. Run `graph show` and, if a relevant graph exists, inspect its node/edge labels:
+
+```bash
+# Check graph structure before defaulting to SQL
+<cli> describe-table <schema>.<graph_name>_nodes
+<cli> describe-table <schema>.<graph_name>_edges
+<cli> query "SELECT DISTINCT LABEL FROM <schema>.<graph_name>_edges LIMIT 20"
+```
+
+### Use Cypher (PGQL) when:
+
+- The question is about **relationships between entities** — mutual connections, "who knows whom," shared interests, influence
+- The query naturally reads as a **path pattern** — `(A)-[rel1]-(B)-[rel2]-(C)`
+- The graph has **typed edge labels** that distinguish relationship semantics (e.g., `liked`, `posted`, `follows`)
+- You need **variable-length traversal** — "friends of friends," reachability within N hops
+- The result depends on **graph topology** — shortest path, centrality, page rank
+
+### Use SQL when:
+
+- The question is about **filtering, aggregation, or ranking** flat tabular data
+- You need **GROUP BY, window functions, or statistical aggregations** on query results (use `GRAPH_TABLE()` wrapper if combining with Cypher)
+- No graph exists for the relevant tables, or the graph lacks meaningful edge/node labels
+- The query is a simple lookup, count, or CRUD operation
+
+### Key misconception: undirected graphs still have direction
+
+An undirected graph (`directed: false`) does NOT mean relationships are directionless. **Edge labels encode semantic direction.** In a graph with `liked` and `posted` edges, the pattern `(user)-[liked]-(post)-[posted]-(user)` constrains traversal by label — which effectively enforces who-liked-whose-post, even though the graph itself is undirected. Do not fall back to SQL simply because a graph is undirected.
+
+### Anti-pattern: SQL tunnel vision
+
+If you start exploration with `show-tables` and `describe-table`, you may get locked into SQL mode and miss that a graph already models the relationships. **When the user's question involves relationships, run `graph show` first** — before examining any tables.
+
 ## Output Interpretation
 
 CLI commands output JSON to stdout. Present results to the user as:
@@ -759,6 +793,7 @@ See [references/json-array-text.md](references/json-array-text.md).
 ### Graph Analytics
 Build property graphs from existing tables, query with Cypher, run algorithms
 (shortest path, page rank, TSP). No separate graph database needed.
+**Prefer Cypher over SQL for relationship queries** — see [SQL vs. Cypher Decision Guide](#sql-vs-cypher-decision-guide).
 See [references/graph-functions.md](references/graph-functions.md) and [references/graph-examples.md](references/graph-examples.md).
 
 ### UDFs, Procedures & ML
@@ -768,6 +803,7 @@ See [references/udf-reference.md](references/udf-reference.md).
 
 ## Query Writing Guidelines
 
+0. **Graph check first** — If the question involves relationships (mutual, paths, connections, influence), run `graph show` before writing SQL. If a relevant graph exists with typed edge labels, use Cypher — see [SQL vs. Cypher Decision Guide](#sql-vs-cypher-decision-guide)
 1. Always check column names and types before writing SQL — Kinetica is case-sensitive
 2. Quote schema-qualified table names: `"schema"."table"`
 3. Use LIMIT for exploration queries
