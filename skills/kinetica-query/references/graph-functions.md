@@ -307,6 +307,84 @@ SELECT * FROM TABLE(
 | `CENTRALITY` | Betweenness centrality (node importance) |
 | `BACKHAUL_ROUTING` | Connect remote assets to backbone nodes |
 
+### SOLVE_GRAPH Examples
+
+```sql
+-- Shortest path between two nodes
+SELECT * FROM TABLE(
+    SOLVE_GRAPH(GRAPH => 'my_graph', SOLVER_TYPE => 'SHORTEST_PATH',
+        SOURCE_NODES => INPUT_TABLE((SELECT 'nodeA' AS NODE)),
+        DESTINATION_NODES => INPUT_TABLE((SELECT 'nodeB' AS NODE)),
+        SOLUTION_TABLE => 'shortest_path_result',
+        OPTIONS => KV_PAIRS(output_edge_path = 'true'))
+)
+
+-- PageRank — no source/destination needed (operates on full graph)
+SELECT * FROM TABLE(
+    SOLVE_GRAPH(GRAPH => 'my_graph', SOLVER_TYPE => 'PAGE_RANK',
+        SOURCE_NODES => INPUT_TABLE((SELECT '' AS NODE)))
+)
+
+-- Betweenness centrality
+SELECT * FROM TABLE(
+    SOLVE_GRAPH(GRAPH => 'my_graph', SOLVER_TYPE => 'CENTRALITY',
+        SOURCE_NODES => INPUT_TABLE((SELECT '' AS NODE)))
+)
+
+-- Closeness centrality
+SELECT * FROM TABLE(
+    SOLVE_GRAPH(GRAPH => 'my_graph', SOLVER_TYPE => 'CLOSENESS',
+        SOURCE_NODES => INPUT_TABLE((SELECT '' AS NODE)))
+)
+
+-- TSP (round-trip minimum cost visiting all waypoints)
+SELECT * FROM TABLE(
+    SOLVE_GRAPH(GRAPH => 'road_network', SOLVER_TYPE => 'MULTIPLE_ROUTING',
+        SOURCE_NODES => INPUT_TABLE((SELECT 'depot' AS NODE)),
+        DESTINATION_NODES => INPUT_TABLE(
+            (SELECT 'stop_A' AS NODE UNION ALL SELECT 'stop_B' AS NODE UNION ALL SELECT 'stop_C' AS NODE)))
+)
+
+-- All paths between two nodes (use uniform_weights for unweighted graphs)
+SELECT * FROM TABLE(
+    SOLVE_GRAPH(GRAPH => 'my_graph', SOLVER_TYPE => 'ALLPATHS',
+        SOURCE_NODES => INPUT_TABLE((SELECT 'nodeA' AS NODE)),
+        DESTINATION_NODES => INPUT_TABLE((SELECT 'nodeB' AS NODE)),
+        OPTIONS => KV_PAIRS(uniform_weights = 'true'))
+)
+
+-- Inverse shortest path — find nodes within cost threshold from a target
+SELECT * FROM TABLE(
+    SOLVE_GRAPH(GRAPH => 'road_network', SOLVER_TYPE => 'INVERSE_SHORTEST_PATH',
+        SOURCE_NODES => INPUT_TABLE((SELECT 'warehouse' AS NODE)),
+        OPTIONS => KV_PAIRS(max_solution_radius = '500'))
+)
+
+-- Backhaul routing — return trip with pickups
+SELECT * FROM TABLE(
+    SOLVE_GRAPH(GRAPH => 'road_network', SOLVER_TYPE => 'BACKHAUL_ROUTING',
+        SOURCE_NODES => INPUT_TABLE((SELECT 'depot' AS NODE)),
+        DESTINATION_NODES => INPUT_TABLE(
+            (SELECT 'delivery_A' AS NODE UNION ALL SELECT 'pickup_B' AS NODE)),
+        SOLUTION_TABLE => 'backhaul_result')
+)
+```
+
+> **Weighted graphs for solvers:** Solvers like SHORTEST_PATH and MULTIPLE_ROUTING require weighted edges. Use `WEIGHT_VALUESPECIFIED` in CREATE GRAPH to assign edge costs:
+
+```sql
+CREATE OR REPLACE DIRECTED GRAPH road_network (
+    NODES => INPUT_TABLES(
+        (SELECT location_id AS NODE, type AS LABEL FROM locations)
+    ),
+    EDGES => INPUT_TABLES(
+        (SELECT origin AS NODE1, destination AS NODE2, mode AS LABEL,
+         cost AS WEIGHT_VALUESPECIFIED FROM routes)
+    ),
+    OPTIONS => KV_PAIRS(save_persist = 'true')
+)
+```
+
 ## MATCH_GRAPH() — Supply-Demand Optimization
 
 Multi-step minimum-cost demand-supply optimization (MSDO) via mixed-integer linear programming:
@@ -367,6 +445,51 @@ EXECUTE FUNCTION MATCH_GRAPH(
 | `DEMAND_SIZE` | Required quantity |
 | `DEMAND_REGION_ID` | Region grouping for demands |
 | `DEMAND_SPECS` | `VARCHAR[]` specifications required |
+
+### MATCH_GRAPH Solve Method Examples
+
+**GPS snap-to-road** (`markov_chain`) — snaps raw GPS coordinates to the nearest graph edges using a Hidden Markov Model:
+
+```sql
+EXECUTE FUNCTION MATCH_GRAPH(
+    GRAPH => 'road_network',
+    SAMPLE_POINTS => INPUT_TABLES(
+        (SELECT ST_GEOMFROMTEXT('POINT(-122.4194 37.7749)') AS SAMPLE_NODE),
+        (SELECT ST_GEOMFROMTEXT('POINT(-122.4089 37.7837)') AS SAMPLE_NODE)
+    ),
+    SOLVE_METHOD => 'markov_chain', SOLUTION_TABLE => 'snapped_points',
+    OPTIONS => KV_PAIRS(gps_noise = '25')
+)
+```
+
+**Isochrone / reachability** (`match_isochrone`) — computes reachable area from a source node within a cost threshold:
+
+```sql
+EXECUTE FUNCTION MATCH_GRAPH(
+    GRAPH => 'road_network',
+    SAMPLE_POINTS => INPUT_TABLES(
+        (SELECT 42 AS SAMPLE_NODE)
+    ),
+    SOLVE_METHOD => 'match_isochrone', SOLUTION_TABLE => 'iso_result',
+    OPTIONS => KV_PAIRS(max_solution_radius = '300', num_levels = '4')
+)
+```
+
+> After `match_isochrone`, visualize with `viz isochrone`.
+
+**EV charging station routing** (`match_charging_stations`) — finds optimal paths via charging stations with range constraints:
+
+```sql
+EXECUTE FUNCTION MATCH_GRAPH(
+    GRAPH => 'road_network',
+    SAMPLE_POINTS => INPUT_TABLES(
+        (SELECT 1 AS SAMPLE_NODE, 0 AS SAMPLE_ORDER),
+        (SELECT 99 AS SAMPLE_NODE, 1 AS SAMPLE_ORDER)
+    ),
+    SOLVE_METHOD => 'match_charging_stations', SOLUTION_TABLE => 'ev_route',
+    OPTIONS => KV_PAIRS(max_charge_range = '150', penalty_per_stop = '10')
+)
+```
 
 ## Graph REST API Endpoints
 
