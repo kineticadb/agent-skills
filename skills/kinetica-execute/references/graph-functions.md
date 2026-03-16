@@ -216,6 +216,7 @@ RETURN n1.node AS n1_name, e1.LABEL AS relationship, n2.node AS n2_name
 - **CRITICAL**: `WHERE` filters must reference columns that were defined as attributes during graph creation — you cannot filter on columns not in the original tables
 - **CRITICAL**: Return aliases must be unique — use `a.node AS originator`, not duplicate column names
 - When the graph's direction opposes your query traversal, flip the arrow: `()<-[]-()`
+- **CRITICAL**: MATCH requires a **single continuous path expression** — chain all nodes and edges into one linear pattern instead of splitting into separate comma-delimited patterns: `MATCH (a)-[e1]->(b)-[e2]->(c)` not `MATCH (a)-[e1]->(b), (b)-[e2]->(c)`
 
 ### Pattern Elements
 | Syntax | Meaning |
