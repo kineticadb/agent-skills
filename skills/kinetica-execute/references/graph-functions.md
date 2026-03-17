@@ -66,27 +66,14 @@ CREATE OR REPLACE TABLE wiki_graph_edges (
 
 ### Inserting Multi-Label Data
 
-Use `string_to_array()` for `VARCHAR[]` label columns:
-
 ```sql
+-- string_to_array() for VARCHAR[] columns
 INSERT INTO wiki_graph_nodes(node, label, age) VALUES
-('Jane',  string_to_array('FEMALE,business', ','), 29),
-('Bill',  string_to_array('MALE,golf', ','), 58),
-('Susan', string_to_array('FEMALE,dance', ','), 24),
-('Alex',  string_to_array('MALE,chess', ','), 23);
+('Jane', string_to_array('FEMALE,business', ','), 29);
 
-INSERT INTO wiki_graph_edges(node1, node2, label, met_time) VALUES
-('Jane', 'Bill',  string_to_array('Friend', ','), '1997-09-15'),
-('Bill', 'Alex',  string_to_array('Family', ','), '1991-02-26'),
-('Bill', 'Susan', string_to_array('Friend', ','), '2001-01-30');
-```
-
-You can also use `ARRAY[...]` literal syntax:
-
-```sql
+-- ARRAY[...] literal syntax
 INSERT INTO news_nodes (node, label) VALUES
-('US Supreme Court', ARRAY['Organization', 'Judicial']),
-('Chicago', ARRAY['Location']);
+('US Supreme Court', ARRAY['Organization', 'Judicial']);
 ```
 
 ## Creating Graphs
@@ -252,7 +239,7 @@ FROM GRAPH_TABLE(
     GRAPH expero.banking_graph
     MATCH (a:bank)-[ab:performed]->(b:wire_message WHERE b.wire_message_risk_score > 20)
           -[bc:is_for_transaction]->(c:banking_transaction)
-          -[d:involved]->(e:internal_account)<-[f:manages]-(g:party)
+          -[d:involved]->(e:internal_account)<-[f:manages]-(g:party)<-[h]-(i)-[]->(j)
     RETURN g.party_name AS person, a.bank_name AS bank,
            g.party_risk_score AS risk_score,
            c.banking_transaction_amount AS amount, j.NODE AS device_id

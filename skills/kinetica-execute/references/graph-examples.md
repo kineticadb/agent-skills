@@ -203,10 +203,48 @@ RETURN a.bank_name AS bank, b.NODE AS wire,
 
 ---
 
-## Social Network: Mutual Likes
+## Social Network: Bluesky
 
 ```sql
--- Who likes Tan back among posts Tan likes?
+-- Create user/post bipartite graph
+CREATE OR REPLACE TABLE bluesky1_nodes (
+    node CHAR(64) NOT NULL,
+    label VARCHAR[] NOT NULL,
+    user_text STRING NOT NULL,
+    user_age INT NOT NULL
+);
+CREATE OR REPLACE TABLE bluesky1_edges (
+    node1 CHAR(64) NOT NULL,
+    node2 CHAR(64) NOT NULL,
+    label CHAR(64) NOT NULL
+);
+
+INSERT INTO bluesky1_nodes(node, label, user_text, user_age) VALUES
+('kaan', string_to_array('user', ','), 'I am a good programmer', 58),
+('tan',  string_to_array('user', ','), 'I am a good manager', 28),
+('post1', string_to_array('post', ','), 'Kinetica is a hybrid DB', 15),
+('post2', string_to_array('post', ','), 'Kinetica is a distributed DB', 24);
+
+INSERT INTO bluesky1_edges(node1, node2, label) VALUES
+('kaan', 'post1', 'posted'),
+('kaan', 'post2', 'liked'),
+('tan',  'post1', 'liked'),
+('tan',  'post2', 'posted');
+
+CREATE OR REPLACE GRAPH bluesky (
+    NODES => INPUT_TABLES((SELECT * FROM bluesky1_nodes)),
+    EDGES => INPUT_TABLES((SELECT * FROM bluesky1_edges)),
+    OPTIONS => KV_PAIRS(label_delimiter = ':',
+                        graph_table = 'bluesky1_graph_table',
+                        schema_edge_labelkeys = 'false',
+                        schema_node_labelkeys = 'false')
+)
+```
+
+## Bluesky: Mutual Likes
+
+```sql
+-- Mutual likes: who likes Tan back?
 GRAPH bluesky
 MATCH (a:user WHERE (a.NODE = 'tan'))-[ab:liked]-(b:post)
       -[bc:posted]-(c:user)-[cd:liked]-(d:post)
@@ -214,10 +252,10 @@ MATCH (a:user WHERE (a.NODE = 'tan'))-[ab:liked]-(b:post)
 RETURN DISTINCT c.NODE AS poster, c.user_text AS info
 ```
 
-## Social Network: Text Search in Traversal
+## Bluesky: Text Search in Traversal
 
 ```sql
--- Find who likes Tan, filtering for posts containing 'distributed'
+-- Text search in traversal: filter for posts containing 'distributed'
 GRAPH bluesky
 MATCH (a:user WHERE (a.NODE = 'tan'))-[ab:liked]-(b:post)
       -[bc:posted]-(c:user)-[cd:liked]-
@@ -226,10 +264,10 @@ MATCH (a:user WHERE (a.NODE = 'tan'))-[ab:liked]-(b:post)
 RETURN DISTINCT c.NODE AS poster, c.user_text AS poster_text, d.user_text AS original
 ```
 
-## Social Network: Age Group Analysis via GRAPH_TABLE()
+## Bluesky: Age Group Analysis via GRAPH_TABLE()
 
 ```sql
--- Average mutual likes by age group
+-- Age group analysis via GRAPH_TABLE()
 -- KI_HINT_QUERY_GRAPH_ENDPOINT_OPTIONS (multi_paths, true)
 SELECT age_group, FLOAT(SUM(total)) / COUNT(og) AS mean_age_back FROM (
     SELECT CASE
@@ -243,11 +281,28 @@ SELECT age_group, FLOAT(SUM(total)) / COUNT(og) AS mean_age_back FROM (
               -[cd:liked]-(d:post)-[de:posted]-(e:user)
         WHERE e.NODE = a.NODE
         RETURN DISTINCT a.NODE AS originator, a.user_age AS age,
-               d.user_age AS post_length
+               d.user_age AS post_age
     )
     GROUP BY age_group, og
 )
 GROUP BY age_group
+```
+
+## Bluesky: Mean Engagement
+
+```sql
+-- Mean engagement across all users
+-- KI_HINT_QUERY_GRAPH_ENDPOINT_OPTIONS (multi_paths, true)
+SELECT FLOAT(SUM(total)) / COUNT(user) AS mean_like_back FROM (
+    SELECT originator AS user, COUNT(*) AS total
+    FROM GRAPH_TABLE(
+        MATCH (a:user)-[ab:liked]-(b:post)-[bc:posted]-(c:user)
+              -[cd:liked]-(d:post)-[de:posted]-(e:user)
+        WHERE e.NODE = a.NODE
+        RETURN DISTINCT a.NODE AS originator, d.user_age AS post_age
+    )
+    GROUP BY 1
+)
 ```
 
 ---
@@ -435,61 +490,18 @@ EXECUTE FUNCTION MATCH_GRAPH(
 )
 ```
 
----
-
-## Social Network: Bluesky with Bipartite Graph
+## Logistics: Shortest Path via SOLVE_GRAPH
 
 ```sql
--- Create user/post bipartite graph
-CREATE OR REPLACE TABLE bluesky1_nodes (
-    node CHAR(64) NOT NULL,
-    label VARCHAR[] NOT NULL,
-    user_text STRING NOT NULL,
-    user_age INT NOT NULL
-);
-CREATE OR REPLACE TABLE bluesky1_edges (
-    node1 CHAR(64) NOT NULL,
-    node2 CHAR(64) NOT NULL,
-    label CHAR(64) NOT NULL
-);
-
--- Users and posts as nodes
-INSERT INTO bluesky1_nodes(node, label, user_text, user_age) VALUES
-('kaan', string_to_array('user', ','), 'I am a good programmer', 58),
-('tan',  string_to_array('user', ','), 'I am a good manager', 28),
-('post1', string_to_array('post', ','), 'Kinetica is a hybrid DB', 15),
-('post2', string_to_array('post', ','), 'Kinetica is a distributed DB', 24);
-
--- Liked/posted relationships
-INSERT INTO bluesky1_edges(node1, node2, label) VALUES
-('kaan', 'post1', 'posted'),
-('kaan', 'post2', 'liked'),
-('tan',  'post1', 'liked'),
-('tan',  'post2', 'posted');
-
-CREATE OR REPLACE GRAPH bluesky (
-    NODES => INPUT_TABLES((SELECT * FROM bluesky1_nodes)),
-    EDGES => INPUT_TABLES((SELECT * FROM bluesky1_edges)),
-    OPTIONS => KV_PAIRS(label_delimiter = ':',
-                        graph_table = 'bluesky1_graph_table',
-                        schema_edge_labelkeys = 'false',
-                        schema_node_labelkeys = 'false')
-)
-```
-
-## Bluesky: Mean Engagement by Age Group
-
-```sql
--- KI_HINT_QUERY_GRAPH_ENDPOINT_OPTIONS (multi_paths, true)
-SELECT FLOAT(SUM(total)) / COUNT(user) AS mean_like_back FROM (
-    SELECT originator AS user, COUNT(*) AS total
-    FROM GRAPH_TABLE(
-        MATCH (a:user)-[ab:liked]-(b:post)-[bc:posted]-(c:user)
-              -[cd:liked]-(d:post)-[de:posted]-(e:user)
-        WHERE e.NODE = a.NODE
-        RETURN DISTINCT a.NODE AS originator, d.user_age AS post_length
+-- Shortest path from MAINHUB to SPOKE using weighted edges
+SELECT * FROM TABLE(
+    SOLVE_GRAPH(
+        GRAPH => 'rearm',
+        SOLVER_TYPE => 'SHORTEST_PATH',
+        SOURCE_NODES => INPUT_TABLE((SELECT 1 AS NODE)),
+        DESTINATION_NODES => INPUT_TABLE((SELECT 7 AS NODE)),
+        SOLUTION_TABLE => 'rearm_shortest_path'
     )
-    GROUP BY 1
 )
 ```
 
@@ -522,109 +534,4 @@ GRAPH rearm
 MATCH (n1 WHERE wktpoint = ST_GEOMFROMTEXT('POINT(3 1)'))
       -[e1]->(n2)-[e2]->(n3)-[e3]->(n4:SPOKE)
 RETURN n1.node AS n1_node, n2.node AS n2_node, n3.node AS n3_node, n4.node AS n4_node
-```
-
----
-
-## SOLVE_GRAPH: Probability Rank
-
-```sql
--- Transition probability ranking from a source node
-SELECT * FROM TABLE(
-    SOLVE_GRAPH(GRAPH => 'my_graph', SOLVER_TYPE => 'PROBABILITY_RANK',
-        SOURCE_NODES => INPUT_TABLE((SELECT 'nodeA' AS NODE)),
-        OPTIONS => KV_PAIRS(max_solution_radius = '5'))
-)
-```
-
-## SOLVE_GRAPH: Stats All
-
-```sql
--- Comprehensive graph statistics with cluster detection
-SELECT * FROM TABLE(
-    SOLVE_GRAPH(GRAPH => 'my_graph', SOLVER_TYPE => 'STATS_ALL',
-        SOURCE_NODES => INPUT_TABLE((SELECT '' AS NODE)),
-        OPTIONS => KV_PAIRS(output_clusters = 'true'))
-)
-```
-
----
-
-## MATCH_GRAPH: Origin-Destination Pair Routing
-
-```sql
--- Route multiple origin-destination pairs in a single call
-EXECUTE FUNCTION MATCH_GRAPH(
-    GRAPH => 'road_network',
-    SAMPLE_POINTS => INPUT_TABLES(
-        (SELECT ST_GEOMFROMTEXT('POINT(-73.9857 40.7484)') AS SAMPLE_NODE,
-         0 AS SAMPLE_ORIGIN, 0 AS SAMPLE_DESTINATION_ID),
-        (SELECT ST_GEOMFROMTEXT('POINT(-73.9681 40.7614)') AS SAMPLE_NODE,
-         1 AS SAMPLE_ORIGIN, 0 AS SAMPLE_DESTINATION_ID),
-        (SELECT ST_GEOMFROMTEXT('POINT(-73.9712 40.7831)') AS SAMPLE_NODE,
-         0 AS SAMPLE_ORIGIN, 1 AS SAMPLE_DESTINATION_ID),
-        (SELECT ST_GEOMFROMTEXT('POINT(-73.9550 40.7700)') AS SAMPLE_NODE,
-         1 AS SAMPLE_ORIGIN, 1 AS SAMPLE_DESTINATION_ID)
-    ),
-    SOLVE_METHOD => 'match_od_pairs', SOLUTION_TABLE => 'od_result',
-    OPTIONS => KV_PAIRS(output_edge_path = 'true')
-)
-```
-
-## MATCH_GRAPH: Batch Shortest Path
-
-```sql
--- Batch multiple shortest-path requests in one call
-EXECUTE FUNCTION MATCH_GRAPH(
-    GRAPH => 'road_network',
-    SAMPLE_POINTS => INPUT_TABLES(
-        (SELECT 'nodeA' AS SAMPLE_NODE, 0 AS SAMPLE_BATCH_ID, 0 AS SAMPLE_ORDER),
-        (SELECT 'nodeB' AS SAMPLE_NODE, 0 AS SAMPLE_BATCH_ID, 1 AS SAMPLE_ORDER),
-        (SELECT 'nodeC' AS SAMPLE_NODE, 1 AS SAMPLE_BATCH_ID, 0 AS SAMPLE_ORDER),
-        (SELECT 'nodeD' AS SAMPLE_NODE, 1 AS SAMPLE_BATCH_ID, 1 AS SAMPLE_ORDER)
-    ),
-    SOLVE_METHOD => 'match_batch_solves', SOLUTION_TABLE => 'batch_result'
-)
-```
-
-## MATCH_GRAPH: Community Detection (Clusters)
-
-```sql
--- Louvain community detection — identifies clusters in the graph
-EXECUTE FUNCTION MATCH_GRAPH(
-    GRAPH => 'social_graph',
-    SAMPLE_POINTS => INPUT_TABLES(
-        (SELECT '' AS SAMPLE_NODE)
-    ),
-    SOLVE_METHOD => 'match_clusters', SOLUTION_TABLE => 'cluster_result',
-    OPTIONS => KV_PAIRS(num_clusters = '5')
-)
-```
-
-## MATCH_GRAPH: Loop Detection
-
-```sql
--- Eulerian closed loop detection — finds cycles from a starting node
-EXECUTE FUNCTION MATCH_GRAPH(
-    GRAPH => 'delivery_graph',
-    SAMPLE_POINTS => INPUT_TABLES(
-        (SELECT 'depot' AS SAMPLE_NODE)
-    ),
-    SOLVE_METHOD => 'match_loops', SOLUTION_TABLE => 'loop_result',
-    OPTIONS => KV_PAIRS(max_solution_radius = '100')
-)
-```
-
-## MATCH_GRAPH: Vertex Similarity
-
-```sql
--- Jaccard similarity between vertex neighborhoods
-EXECUTE FUNCTION MATCH_GRAPH(
-    GRAPH => 'social_graph',
-    SAMPLE_POINTS => INPUT_TABLES(
-        (SELECT 'userA' AS SAMPLE_NODE),
-        (SELECT 'userB' AS SAMPLE_NODE)
-    ),
-    SOLVE_METHOD => 'match_similarity', SOLUTION_TABLE => 'similarity_result'
-)
 ```
