@@ -260,7 +260,7 @@ See [Graph Operations Workflow](#graph-operations-workflow) for the full decisio
 | Command | Args | Description |
 |---------|------|-------------|
 | `viz chart` | `<table> --x-column --y-column --output <file>` | Generate a chart image |
-| `viz heatmap` | `<table> --x-col --y-col [--value-col] [--srs EPSG:4326] [--blur-radius N] [--colormap NAME] [--min-x/max-x/min-y/max-y] [--width] [--height] --output <file>` | Generate a heatmap via WMS |
+| `viz heatmap` | `<table> (--x-col --y-col \| --geo-col) [--value-col] [--srs EPSG:4326] [--blur-radius N] [--colormap NAME] [--min-x/max-x/min-y/max-y] [--width] [--height] --output <file>` | Generate a heatmap via WMS |
 | `viz isochrone` | `<graph> --source <node_id> --max-radius <cost> [--num-levels N] [--weights-on-edges <cols>] --output <file>` | Generate isochrone contours |
 | `viz classbreak` | `--config <json_or_@file> --output <file>` | Generate class-break map via WMS |
 | `viz wms` | `--config <json_or_@file> --output <file>` | Send a custom WMS request |
@@ -268,6 +268,11 @@ See [Graph Operations Workflow](#graph-operations-workflow) for the full decisio
 > **Output:** All viz commands require `--output <file>` to write the image to disk. After the command succeeds, you **MUST** include a clickable file link so the user can view or download the PNG. Use the absolute path and present it as: `[filename.png](file:///absolute/path/to/filename.png)`. If the `--output` value was relative, resolve it against the current working directory. Do NOT use `--preview` — terminal ASCII art is not visible in this environment.
 
 > **Isochrone parameters:** `--source` is a graph node ID (not WKT). `--max-radius` is the cost threshold in the same units as the graph's edge weights (distance, time, etc. — default: 100). `--num-levels` sets the number of contour bands (default: 4). Use `--weights-on-edges` to specify which weight columns to use for cost calculation.
+
+> **Choosing GEO_ATTR vs X_ATTR/Y_ATTR:** Before generating a heatmap, classbreak, or WMS visualization, check the table schema via `describe-table`:
+> - If the table has a **WKT/geometry column** (type `string` with WKT data like `POINT(...)`, `LINESTRING(...)`, etc.) → use `--geo-col` (heatmap) or `"geo_attr"` / `"GEO_ATTR"` (classbreak/wms JSON config)
+> - If the table has **separate longitude/latitude columns** → use `--x-col`/`--y-col` (heatmap) or `"x_attr"`/`"y_attr"` / `"X_ATTR"`/`"Y_ATTR"` (classbreak/wms JSON config)
+> - **Never combine both** — `GEO_ATTR` and `X_ATTR`/`Y_ATTR` are mutually exclusive; the CLI will reject the request
 
 ### Monitor Commands
 
@@ -353,14 +358,20 @@ python3 <skill_path>/scripts/kinetica-cli.py io kifs-list /data/uploads
 # Generate a chart
 python3 <skill_path>/scripts/kinetica-cli.py viz chart sales --x-column month --y-column revenue --output chart.png
 
-# Generate a heatmap
+# Generate a heatmap (separate lon/lat columns)
 python3 <skill_path>/scripts/kinetica-cli.py viz heatmap sensor_data --x-col lon --y-col lat --value-col temperature --colormap jet --output heatmap.png
+
+# Generate a heatmap (WKT geometry column)
+python3 <skill_path>/scripts/kinetica-cli.py viz heatmap geo_table --geo-col geom --value-col temperature --colormap viridis --output heatmap_geo.png
 
 # Generate isochrone contours
 python3 <skill_path>/scripts/kinetica-cli.py viz isochrone my_graph --source 42 --max-radius 300 --output isochrone.png
 
-# Generate a class-break map
+# Generate a class-break map (separate lon/lat columns)
 python3 <skill_path>/scripts/kinetica-cli.py viz classbreak --config '{"LAYERS":"my_table","BBOX":"-180,-90,180,90","CB_ATTR":"category","CB_VALS":"A,B,C","X_ATTR":"lon","Y_ATTR":"lat"}' --output classbreak.png
+
+# Generate a class-break map (WKT geometry column)
+python3 <skill_path>/scripts/kinetica-cli.py viz classbreak --config '{"LAYERS":"geo_table","BBOX":"-180,-90,180,90","CB_ATTR":"category","CB_VALS":"A,B,C","geo_attr":"geom"}' --output classbreak_geo.png
 
 # Generate a custom WMS map
 python3 <skill_path>/scripts/kinetica-cli.py viz wms --config '{"LAYERS":"my_table","BBOX":"-122.5,37.7,-122.3,37.8","STYLES":"raster","X_ATTR":"lon","Y_ATTR":"lat"}' --output wms.png

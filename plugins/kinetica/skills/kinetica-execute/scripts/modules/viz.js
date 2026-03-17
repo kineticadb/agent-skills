@@ -96,30 +96,51 @@ function handleBinaryImageOutput(buffer, outputPath, previewWidth) {
  * @param {number} [opts.maxY=90] - Bounding box max Y
  * @param {number} [opts.width=800] - Image width
  * @param {number} [opts.height=600] - Image height
- * @param {string} [opts.xAttr] - X attribute column
- * @param {string} [opts.yAttr] - Y attribute column
+ * @param {string} [opts.xAttr] - X attribute column (mutually exclusive with geoAttr)
+ * @param {string} [opts.yAttr] - Y attribute column (mutually exclusive with geoAttr)
+ * @param {string} [opts.geoAttr] - WKT/geometry column (mutually exclusive with xAttr/yAttr)
  * @param {object} [opts.extra={}] - Additional WMS params merged last
  * @returns {object} Flat WMS parameter dict
  */
 function buildWmsParams(opts) {
+  if (opts.geoAttr && (opts.xAttr || opts.yAttr)) {
+    die('GEO_ATTR and X_ATTR/Y_ATTR are mutually exclusive');
+  }
+
+  const WORLD = { minX: -180, minY: -90, maxX: 180, maxY: 90 };
+  const PAD = 0.3;
+
+  let minX = opts.minX != null ? opts.minX : WORLD.minX;
+  let minY = opts.minY != null ? opts.minY : WORLD.minY;
+  let maxX = opts.maxX != null ? opts.maxX : WORLD.maxX;
+  let maxY = opts.maxY != null ? opts.maxY : WORLD.maxY;
+
+  const isCustom = minX !== WORLD.minX || minY !== WORLD.minY
+                || maxX !== WORLD.maxX || maxY !== WORLD.maxY;
+  if (isCustom) {
+    minX = Math.max(WORLD.minX, minX - PAD);
+    minY = Math.max(WORLD.minY, minY - PAD);
+    maxX = Math.min(WORLD.maxX, maxX + PAD);
+    maxY = Math.min(WORLD.maxY, maxY + PAD);
+  }
+
   const params = {
     REQUEST: 'GetMap',
     FORMAT: 'image/png',
     SRS: opts.srs || 'EPSG:4326',
     LAYERS: opts.table,
-    BBOX: [
-      opts.minX != null ? opts.minX : -180,
-      opts.minY != null ? opts.minY : -90,
-      opts.maxX != null ? opts.maxX : 180,
-      opts.maxY != null ? opts.maxY : 90,
-    ].join(','),
+    BBOX: [minX, minY, maxX, maxY].join(','),
     WIDTH: opts.width || 800,
     HEIGHT: opts.height || 600,
   };
 
   if (opts.styles) params.STYLES = opts.styles;
-  if (opts.xAttr) params.X_ATTR = opts.xAttr;
-  if (opts.yAttr) params.Y_ATTR = opts.yAttr;
+  if (opts.geoAttr) {
+    params.GEO_ATTR = opts.geoAttr;
+  } else {
+    if (opts.xAttr) params.X_ATTR = opts.xAttr;
+    if (opts.yAttr) params.Y_ATTR = opts.yAttr;
+  }
 
   return { ...params, ...(opts.extra || {}) };
 }
@@ -221,7 +242,7 @@ async function cmdHeatmap(db, args) {
   const tableName = args.positional[0];
   if (!tableName) {
     die(
-      'Usage: viz heatmap <table> --x-col COL --y-col COL ' +
+      'Usage: viz heatmap <table> (--x-col COL --y-col COL | --geo-col COL) ' +
         '[--value-col COL] [--srs EPSG:4326] [--blur-radius 5] [--colormap jet] ' +
         '[--min-x N --max-x N --min-y N --max-y N] ' +
         '[--width 800] [--height 600] [--output file.png]'
@@ -230,8 +251,13 @@ async function cmdHeatmap(db, args) {
 
   const xCol = args.flags['x-col'];
   const yCol = args.flags['y-col'];
-  if (!xCol || !yCol) {
-    die('--x-col and --y-col are required');
+  const geoCol = args.flags['geo-col'];
+
+  if (geoCol && (xCol || yCol)) {
+    die('--geo-col and --x-col/--y-col are mutually exclusive');
+  }
+  if (!geoCol && (!xCol || !yCol)) {
+    die('Either --geo-col or both --x-col and --y-col are required');
   }
 
   const extra = {};
@@ -256,6 +282,7 @@ async function cmdHeatmap(db, args) {
     height: parseInt(args.flags.height || '600', 10),
     xAttr: xCol,
     yAttr: yCol,
+    geoAttr: geoCol,
     extra,
   });
 
@@ -335,6 +362,7 @@ function buildClassbreakParams(config) {
     height: config.height || config.HEIGHT,
     xAttr: config.x_attr,
     yAttr: config.y_attr,
+    geoAttr: config.geo_attr,
     extra: config.BBOX ? { BBOX: config.BBOX } : {},
   });
 

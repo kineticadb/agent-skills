@@ -103,14 +103,32 @@ def _build_wms_params(opts):
 
     Args:
         opts: dict with keys table, styles, srs, min_x, min_y, max_x, max_y,
-              width, height, x_attr, y_attr, extra.
+              width, height, x_attr, y_attr, geo_attr, extra.
     Returns:
         Flat dict of WMS query parameters.
     """
-    min_x = opts.get("min_x", -180)
-    min_y = opts.get("min_y", -90)
-    max_x = opts.get("max_x", 180)
-    max_y = opts.get("max_y", 90)
+    geo_attr = opts.get("geo_attr")
+    x_attr = opts.get("x_attr")
+    y_attr = opts.get("y_attr")
+
+    if geo_attr and (x_attr or y_attr):
+        die("GEO_ATTR and X_ATTR/Y_ATTR are mutually exclusive")
+
+    WORLD = {"min_x": -180, "min_y": -90, "max_x": 180, "max_y": 90}
+    PAD = 0.3
+
+    min_x = opts.get("min_x", WORLD["min_x"])
+    min_y = opts.get("min_y", WORLD["min_y"])
+    max_x = opts.get("max_x", WORLD["max_x"])
+    max_y = opts.get("max_y", WORLD["max_y"])
+
+    is_custom = (min_x != WORLD["min_x"] or min_y != WORLD["min_y"]
+              or max_x != WORLD["max_x"] or max_y != WORLD["max_y"])
+    if is_custom:
+        min_x = max(WORLD["min_x"], min_x - PAD)
+        min_y = max(WORLD["min_y"], min_y - PAD)
+        max_x = min(WORLD["max_x"], max_x + PAD)
+        max_y = min(WORLD["max_y"], max_y + PAD)
 
     params = {
         "REQUEST": "GetMap",
@@ -124,10 +142,13 @@ def _build_wms_params(opts):
 
     if opts.get("styles"):
         params["STYLES"] = opts["styles"]
-    if opts.get("x_attr"):
-        params["X_ATTR"] = opts["x_attr"]
-    if opts.get("y_attr"):
-        params["Y_ATTR"] = opts["y_attr"]
+    if geo_attr:
+        params["GEO_ATTR"] = geo_attr
+    else:
+        if x_attr:
+            params["X_ATTR"] = x_attr
+        if y_attr:
+            params["Y_ATTR"] = y_attr
 
     extra = opts.get("extra", {})
     return {**params, **extra}
@@ -270,12 +291,16 @@ def cmd_chart(db, args):
 def _build_heatmap_args(parser):
     parser.add_argument("table_name", help="Source table name")
     parser.add_argument(
-        "--x-col", dest="x_col", required=True,
-        help="Column name for X coordinate",
+        "--x-col", dest="x_col", default=None,
+        help="Column name for X coordinate (mutually exclusive with --geo-col)",
     )
     parser.add_argument(
-        "--y-col", dest="y_col", required=True,
-        help="Column name for Y coordinate",
+        "--y-col", dest="y_col", default=None,
+        help="Column name for Y coordinate (mutually exclusive with --geo-col)",
+    )
+    parser.add_argument(
+        "--geo-col", dest="geo_col", default=None,
+        help="WKT/geometry column (mutually exclusive with --x-col/--y-col)",
     )
     parser.add_argument("--value-col", dest="value_col", default="", help="Column name for the heatmap value")
     parser.add_argument("--srs", default="EPSG:4326", help="Spatial reference system (default: EPSG:4326)")
@@ -295,7 +320,16 @@ def cmd_heatmap(db, args):
     """Generate a heatmap image via WMS."""
     table_name = args.table_name
     if not table_name:
-        die("Usage: viz heatmap <table> --x-col COL --y-col COL [options]")
+        die("Usage: viz heatmap <table> (--x-col COL --y-col COL | --geo-col COL) [options]")
+
+    geo_col = args.geo_col
+    x_col = args.x_col
+    y_col = args.y_col
+
+    if geo_col and (x_col or y_col):
+        die("--geo-col and --x-col/--y-col are mutually exclusive")
+    if not geo_col and (not x_col or not y_col):
+        die("Either --geo-col or both --x-col and --y-col are required")
 
     extra = {}
     if args.value_col:
@@ -315,8 +349,9 @@ def cmd_heatmap(db, args):
         "max_y": args.max_y,
         "width": args.width,
         "height": args.height,
-        "x_attr": args.x_col,
-        "y_attr": args.y_col,
+        "x_attr": x_col,
+        "y_attr": y_col,
+        "geo_attr": geo_col,
         "extra": extra,
     })
 
@@ -427,6 +462,7 @@ def _build_classbreak_params(config):
         "height": config.get("height") or config.get("HEIGHT") or 600,
         "x_attr": config.get("x_attr"),
         "y_attr": config.get("y_attr"),
+        "geo_attr": config.get("geo_attr"),
         "extra": extra,
     })
 
