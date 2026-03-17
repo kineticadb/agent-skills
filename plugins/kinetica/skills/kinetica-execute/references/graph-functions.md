@@ -307,6 +307,10 @@ SELECT * FROM TABLE(
 | `MULTIPLE_ROUTING` | Traveling Salesman Problem (round-trip min cost) |
 | `CENTRALITY` | Betweenness centrality (node importance) |
 | `BACKHAUL_ROUTING` | Connect remote assets to backbone nodes |
+| `CLOSENESS` | Closeness centrality (inverse avg distance to all nodes) |
+| `INVERSE_SHORTEST_PATH` | Find nodes within cost threshold from a target |
+| `PROBABILITY_RANK` | Transition probability ranking from a source node |
+| `STATS_ALL` | Comprehensive graph statistics and cluster detection |
 
 ### SOLVE_GRAPH Examples
 
@@ -369,6 +373,20 @@ SELECT * FROM TABLE(
             (SELECT 'delivery_A' AS NODE UNION ALL SELECT 'pickup_B' AS NODE)),
         SOLUTION_TABLE => 'backhaul_result')
 )
+
+-- Probability rank — transition probabilities from a source node
+SELECT * FROM TABLE(
+    SOLVE_GRAPH(GRAPH => 'my_graph', SOLVER_TYPE => 'PROBABILITY_RANK',
+        SOURCE_NODES => INPUT_TABLE((SELECT 'nodeA' AS NODE)),
+        OPTIONS => KV_PAIRS(max_solution_radius = '5'))
+)
+
+-- Stats all — comprehensive graph statistics and cluster detection
+SELECT * FROM TABLE(
+    SOLVE_GRAPH(GRAPH => 'my_graph', SOLVER_TYPE => 'STATS_ALL',
+        SOURCE_NODES => INPUT_TABLE((SELECT '' AS NODE)),
+        OPTIONS => KV_PAIRS(output_clusters = 'true'))
+)
 ```
 
 > **Weighted graphs for solvers:** Solvers like SHORTEST_PATH and MULTIPLE_ROUTING require weighted edges. Use `WEIGHT_VALUESPECIFIED` in CREATE GRAPH to assign edge costs:
@@ -420,6 +438,11 @@ EXECUTE FUNCTION MATCH_GRAPH(
 | `markov_chain` | Hidden Markov Model for GPS snap-to-road |
 | `match_charging_stations` | Optimal path across EV charging stations |
 | `match_isochrone` | Reachability limits (isochrone polygons) |
+| `match_od_pairs` | Origin-destination pair routing with WKT points |
+| `match_batch_solves` | Batch shortest path processing for multiple pairs |
+| `match_clusters` | Louvain community detection (graph clustering) |
+| `match_loops` | Eulerian closed loop detection |
+| `match_similarity` | Jaccard vertex similarity scoring |
 
 ### MSDO Key Concepts
 - **Multi-step**: Works backward from final demand (sink) to find first accommodating supply (source); previous supplies become demand for next optimization run
@@ -489,6 +512,80 @@ EXECUTE FUNCTION MATCH_GRAPH(
     ),
     SOLVE_METHOD => 'match_charging_stations', SOLUTION_TABLE => 'ev_route',
     OPTIONS => KV_PAIRS(max_charge_range = '150', penalty_per_stop = '10')
+)
+```
+
+**Origin-destination pair routing** (`match_od_pairs`) — routes multiple origin-destination pairs in a single call using WKT points:
+
+```sql
+EXECUTE FUNCTION MATCH_GRAPH(
+    GRAPH => 'road_network',
+    SAMPLE_POINTS => INPUT_TABLES(
+        (SELECT ST_GEOMFROMTEXT('POINT(-73.9857 40.7484)') AS SAMPLE_NODE,
+         0 AS SAMPLE_ORIGIN, 0 AS SAMPLE_DESTINATION_ID),
+        (SELECT ST_GEOMFROMTEXT('POINT(-73.9681 40.7614)') AS SAMPLE_NODE,
+         1 AS SAMPLE_ORIGIN, 0 AS SAMPLE_DESTINATION_ID),
+        (SELECT ST_GEOMFROMTEXT('POINT(-73.9712 40.7831)') AS SAMPLE_NODE,
+         0 AS SAMPLE_ORIGIN, 1 AS SAMPLE_DESTINATION_ID),
+        (SELECT ST_GEOMFROMTEXT('POINT(-73.9550 40.7700)') AS SAMPLE_NODE,
+         1 AS SAMPLE_ORIGIN, 1 AS SAMPLE_DESTINATION_ID)
+    ),
+    SOLVE_METHOD => 'match_od_pairs', SOLUTION_TABLE => 'od_result',
+    OPTIONS => KV_PAIRS(output_edge_path = 'true')
+)
+```
+
+**Batch shortest path** (`match_batch_solves`) — processes multiple shortest-path requests in a single batch call:
+
+```sql
+EXECUTE FUNCTION MATCH_GRAPH(
+    GRAPH => 'road_network',
+    SAMPLE_POINTS => INPUT_TABLES(
+        (SELECT 'nodeA' AS SAMPLE_NODE, 0 AS SAMPLE_BATCH_ID, 0 AS SAMPLE_ORDER),
+        (SELECT 'nodeB' AS SAMPLE_NODE, 0 AS SAMPLE_BATCH_ID, 1 AS SAMPLE_ORDER),
+        (SELECT 'nodeC' AS SAMPLE_NODE, 1 AS SAMPLE_BATCH_ID, 0 AS SAMPLE_ORDER),
+        (SELECT 'nodeD' AS SAMPLE_NODE, 1 AS SAMPLE_BATCH_ID, 1 AS SAMPLE_ORDER)
+    ),
+    SOLVE_METHOD => 'match_batch_solves', SOLUTION_TABLE => 'batch_result'
+)
+```
+
+**Community detection** (`match_clusters`) — identifies communities via Louvain modularity optimization:
+
+```sql
+EXECUTE FUNCTION MATCH_GRAPH(
+    GRAPH => 'social_graph',
+    SAMPLE_POINTS => INPUT_TABLES(
+        (SELECT '' AS SAMPLE_NODE)
+    ),
+    SOLVE_METHOD => 'match_clusters', SOLUTION_TABLE => 'cluster_result',
+    OPTIONS => KV_PAIRS(num_clusters = '5')
+)
+```
+
+**Loop detection** (`match_loops`) — finds Eulerian closed loops (cycles) in a graph:
+
+```sql
+EXECUTE FUNCTION MATCH_GRAPH(
+    GRAPH => 'delivery_graph',
+    SAMPLE_POINTS => INPUT_TABLES(
+        (SELECT 'depot' AS SAMPLE_NODE)
+    ),
+    SOLVE_METHOD => 'match_loops', SOLUTION_TABLE => 'loop_result',
+    OPTIONS => KV_PAIRS(max_solution_radius = '100')
+)
+```
+
+**Vertex similarity** (`match_similarity`) — computes Jaccard similarity scores between vertex neighborhoods:
+
+```sql
+EXECUTE FUNCTION MATCH_GRAPH(
+    GRAPH => 'social_graph',
+    SAMPLE_POINTS => INPUT_TABLES(
+        (SELECT 'userA' AS SAMPLE_NODE),
+        (SELECT 'userB' AS SAMPLE_NODE)
+    ),
+    SOLVE_METHOD => 'match_similarity', SOLUTION_TABLE => 'similarity_result'
 )
 ```
 

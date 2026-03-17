@@ -24,6 +24,7 @@ SOLVER_TYPES = [
     "BACKHAUL_ROUTING",
     "TSP",
     "CLOSENESS",
+    "STATS_ALL",
 ]
 
 SOLVE_METHODS = [
@@ -31,6 +32,11 @@ SOLVE_METHODS = [
     "match_od_pairs",
     "match_supply_demand",
     "match_batch_solves",
+    "match_clusters",
+    "match_loops",
+    "match_similarity",
+    "match_charging_stations",
+    "match_isochrone",
 ]
 
 

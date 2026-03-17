@@ -523,3 +523,108 @@ MATCH (n1 WHERE wktpoint = ST_GEOMFROMTEXT('POINT(3 1)'))
       -[e1]->(n2)-[e2]->(n3)-[e3]->(n4:SPOKE)
 RETURN n1.node AS n1_node, n2.node AS n2_node, n3.node AS n3_node, n4.node AS n4_node
 ```
+
+---
+
+## SOLVE_GRAPH: Probability Rank
+
+```sql
+-- Transition probability ranking from a source node
+SELECT * FROM TABLE(
+    SOLVE_GRAPH(GRAPH => 'my_graph', SOLVER_TYPE => 'PROBABILITY_RANK',
+        SOURCE_NODES => INPUT_TABLE((SELECT 'nodeA' AS NODE)),
+        OPTIONS => KV_PAIRS(max_solution_radius = '5'))
+)
+```
+
+## SOLVE_GRAPH: Stats All
+
+```sql
+-- Comprehensive graph statistics with cluster detection
+SELECT * FROM TABLE(
+    SOLVE_GRAPH(GRAPH => 'my_graph', SOLVER_TYPE => 'STATS_ALL',
+        SOURCE_NODES => INPUT_TABLE((SELECT '' AS NODE)),
+        OPTIONS => KV_PAIRS(output_clusters = 'true'))
+)
+```
+
+---
+
+## MATCH_GRAPH: Origin-Destination Pair Routing
+
+```sql
+-- Route multiple origin-destination pairs in a single call
+EXECUTE FUNCTION MATCH_GRAPH(
+    GRAPH => 'road_network',
+    SAMPLE_POINTS => INPUT_TABLES(
+        (SELECT ST_GEOMFROMTEXT('POINT(-73.9857 40.7484)') AS SAMPLE_NODE,
+         0 AS SAMPLE_ORIGIN, 0 AS SAMPLE_DESTINATION_ID),
+        (SELECT ST_GEOMFROMTEXT('POINT(-73.9681 40.7614)') AS SAMPLE_NODE,
+         1 AS SAMPLE_ORIGIN, 0 AS SAMPLE_DESTINATION_ID),
+        (SELECT ST_GEOMFROMTEXT('POINT(-73.9712 40.7831)') AS SAMPLE_NODE,
+         0 AS SAMPLE_ORIGIN, 1 AS SAMPLE_DESTINATION_ID),
+        (SELECT ST_GEOMFROMTEXT('POINT(-73.9550 40.7700)') AS SAMPLE_NODE,
+         1 AS SAMPLE_ORIGIN, 1 AS SAMPLE_DESTINATION_ID)
+    ),
+    SOLVE_METHOD => 'match_od_pairs', SOLUTION_TABLE => 'od_result',
+    OPTIONS => KV_PAIRS(output_edge_path = 'true')
+)
+```
+
+## MATCH_GRAPH: Batch Shortest Path
+
+```sql
+-- Batch multiple shortest-path requests in one call
+EXECUTE FUNCTION MATCH_GRAPH(
+    GRAPH => 'road_network',
+    SAMPLE_POINTS => INPUT_TABLES(
+        (SELECT 'nodeA' AS SAMPLE_NODE, 0 AS SAMPLE_BATCH_ID, 0 AS SAMPLE_ORDER),
+        (SELECT 'nodeB' AS SAMPLE_NODE, 0 AS SAMPLE_BATCH_ID, 1 AS SAMPLE_ORDER),
+        (SELECT 'nodeC' AS SAMPLE_NODE, 1 AS SAMPLE_BATCH_ID, 0 AS SAMPLE_ORDER),
+        (SELECT 'nodeD' AS SAMPLE_NODE, 1 AS SAMPLE_BATCH_ID, 1 AS SAMPLE_ORDER)
+    ),
+    SOLVE_METHOD => 'match_batch_solves', SOLUTION_TABLE => 'batch_result'
+)
+```
+
+## MATCH_GRAPH: Community Detection (Clusters)
+
+```sql
+-- Louvain community detection — identifies clusters in the graph
+EXECUTE FUNCTION MATCH_GRAPH(
+    GRAPH => 'social_graph',
+    SAMPLE_POINTS => INPUT_TABLES(
+        (SELECT '' AS SAMPLE_NODE)
+    ),
+    SOLVE_METHOD => 'match_clusters', SOLUTION_TABLE => 'cluster_result',
+    OPTIONS => KV_PAIRS(num_clusters = '5')
+)
+```
+
+## MATCH_GRAPH: Loop Detection
+
+```sql
+-- Eulerian closed loop detection — finds cycles from a starting node
+EXECUTE FUNCTION MATCH_GRAPH(
+    GRAPH => 'delivery_graph',
+    SAMPLE_POINTS => INPUT_TABLES(
+        (SELECT 'depot' AS SAMPLE_NODE)
+    ),
+    SOLVE_METHOD => 'match_loops', SOLUTION_TABLE => 'loop_result',
+    OPTIONS => KV_PAIRS(max_solution_radius = '100')
+)
+```
+
+## MATCH_GRAPH: Vertex Similarity
+
+```sql
+-- Jaccard similarity between vertex neighborhoods
+EXECUTE FUNCTION MATCH_GRAPH(
+    GRAPH => 'social_graph',
+    SAMPLE_POINTS => INPUT_TABLES(
+        (SELECT 'userA' AS SAMPLE_NODE),
+        (SELECT 'userB' AS SAMPLE_NODE)
+    ),
+    SOLVE_METHOD => 'match_similarity', SOLUTION_TABLE => 'similarity_result'
+)
+```
