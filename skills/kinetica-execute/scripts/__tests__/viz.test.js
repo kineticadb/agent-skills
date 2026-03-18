@@ -229,7 +229,7 @@ describe('heatmap', () => {
         LAYERS: 'mytable',
         STYLES: 'heatmap',
         SRS: 'EPSG:3857',
-        BBOX: '-100,-50,100,50',
+        BBOX: '-100.3,-50.3,100.3,50.3',
         WIDTH: 1024,
         HEIGHT: 768,
         X_ATTR: 'lon',
