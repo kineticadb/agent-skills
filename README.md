@@ -11,12 +11,14 @@ npx skills add kineticadb/agent-skills
 That's it. The CLI detects your agents and installs all four skills. Claude picks the right one based on what you're doing.
 
 **Claude Code** (marketplace):
-```
+
+```bash
 /plugin marketplace add kineticadb/agent-skills
 /plugin install kineticadb@kinetica-skills
 ```
 
 **Manual** (any agent):
+
 ```bash
 cp -r skills/kinetica-query .claude/skills/    # Claude Code
 cp -r skills/kinetica-query .cursor/skills/    # Cursor
@@ -26,7 +28,7 @@ cp -r skills/kinetica-query .agents/skills/    # Codex, Windsurf, Roo, etc.
 ## Skills
 
 | Skill | Audience | What it teaches | References |
-|-------|----------|-----------------|------------|
+| ----- | -------- | --------------- | ---------- |
 | **kinetica-query** | Data analysts | SQL analytics — geospatial, time-series, vector search, graph, JSON | 15 files |
 | **kinetica-code** | App developers | Python SDK, REST API, data pipelines, embedded SQL | 7 files |
 | **kinetica-admin** | DBAs | System tables, EXPLAIN, resource groups, security, tier management | 7 files |
@@ -38,7 +40,7 @@ All four install together. Each SKILL.md has a `description` field that tells th
 
 Each skill is a directory with a standard layout:
 
-```
+```text
 skills/kinetica-query/
 ├── SKILL.md       # Entry point — agent reads this first
 └── references/    # Detailed docs — agent reads on demand
@@ -50,7 +52,7 @@ skills/kinetica-query/
 
 ## Project Structure
 
-```
+```text
 agent-skills/
 ├── skills/                # All skills live here (canonical)
 │   ├── kinetica-query/    #   SKILL.md + REFS + references/
@@ -68,11 +70,13 @@ agent-skills/
 ## Uninstall / Reset
 
 To remove the plugin from Claude Code:
-```
+
+```bash
 /plugin marketplace remove kinetica-skills
 ```
 
 **Upgrading from the old 3-plugin format?** If you previously installed `kinetica-query`, `kinetica-code`, or `kinetica-admin` as separate plugins, remove all old data first:
+
 ```bash
 rm -rf ~/.claude/plugins/cache/kinetica-skills
 rm -rf ~/.claude/plugins/marketplaces/kinetica-skills
@@ -81,7 +85,8 @@ rm -rf ~/.claude/plugins/marketplaces/kineticadb-agent-skills
 ```
 
 Then install fresh:
-```
+
+```bash
 /plugin marketplace add kineticadb/agent-skills
 /plugin install kineticadb@kinetica-skills
 ```
