@@ -14,6 +14,7 @@ from modules.helpers import (
     check_status,
     columnar_to_rows,
     die,
+    extract_array_type,
     extract_columnar_data,
     format_avro_type,
     out,
@@ -109,9 +110,18 @@ def cmd_describe_table(db, args):
                 if isinstance(properties_list[0], str)
                 else properties_list[0]
             )
+            new_columns = []
             for col in columns:
                 if col["name"] in props:
-                    col["properties"] = props[col["name"]]
+                    col_props = props[col["name"]]
+                    arr_type = extract_array_type(col_props)
+                    entry = {**col, "properties": col_props}
+                    if arr_type:
+                        entry = {**entry, "type": arr_type}
+                    new_columns.append(entry)
+                else:
+                    new_columns.append(col)
+            columns = new_columns
         except (json.JSONDecodeError, KeyError, TypeError):
             pass
 

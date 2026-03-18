@@ -214,6 +214,65 @@ describe('describe-table', () => {
       'shard_key',
     ]);
   });
+
+  it('handles properties as pre-parsed object (not JSON string)', async () => {
+    const schema = JSON.stringify({
+      fields: [{ name: 'id', type: 'int' }],
+    });
+    const db = createMockDb({
+      show_table: vi.fn().mockResolvedValue({
+        type_schemas: [schema],
+        sizes: [10],
+        type_ids: ['t1'],
+        properties: [{ id: ['primary_key', 'shard_key'] }],
+      }),
+    });
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await core['describe-table'].fn(db, makeArgs(['mytable']));
+
+    const result = capturedOutput(logSpy);
+    expect(result.columns[0].properties).toEqual([
+      'primary_key',
+      'shard_key',
+    ]);
+  });
+
+  it('overrides type to array<string> when properties contain array(string,-1)', async () => {
+    const schema = JSON.stringify({
+      fields: [
+        { name: 'node', type: 'string' },
+        { name: 'label', type: 'string' },
+      ],
+    });
+    const props = JSON.stringify({
+      node: ['data', 'char64'],
+      label: ['data', 'array(string,-1)'],
+    });
+    const db = createMockDb({
+      show_table: vi.fn().mockResolvedValue({
+        type_schemas: [schema],
+        sizes: [100],
+        type_ids: ['t1'],
+        properties: [props],
+      }),
+    });
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await core['describe-table'].fn(db, makeArgs(['graph_table']));
+
+    const result = capturedOutput(logSpy);
+    expect(result.columns[0]).toEqual({
+      name: 'node',
+      type: 'string',
+      properties: ['data', 'char64'],
+    });
+    expect(result.columns[1]).toEqual({
+      name: 'label',
+      type: 'array<string>',
+      properties: ['data', 'array(string,-1)'],
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

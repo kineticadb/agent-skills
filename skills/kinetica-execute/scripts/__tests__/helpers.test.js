@@ -36,6 +36,7 @@ const {
   parseCsvArg,
   parseFloatCsv,
   formatAvroType,
+  extractArrayType,
 } = require('../modules/helpers');
 
 // ---------------------------------------------------------------------------
@@ -403,6 +404,42 @@ describe('formatAvroType', () => {
 
   it('joins multiple non-null types with pipe', () => {
     expect(formatAvroType(['string', 'int'])).toBe('string|int');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// extractArrayType
+// ---------------------------------------------------------------------------
+
+describe('extractArrayType', () => {
+  it('extracts array<string> from array(string,-1) property', () => {
+    expect(extractArrayType(['data', 'array(string,-1)'])).toBe('array<string>');
+  });
+
+  it('extracts array<int> from array(int,-1) property', () => {
+    expect(extractArrayType(['data', 'array(int,-1)'])).toBe('array<int>');
+  });
+
+  it('extracts array type even with other properties present', () => {
+    expect(extractArrayType(['data', 'shard_key', 'array(float,5)'])).toBe('array<float>');
+  });
+
+  it('returns null when no array property is present', () => {
+    expect(extractArrayType(['data', 'char64'])).toBeNull();
+  });
+
+  it('returns null for empty array', () => {
+    expect(extractArrayType([])).toBeNull();
+  });
+
+  it('returns null for non-array input', () => {
+    expect(extractArrayType(null)).toBeNull();
+    expect(extractArrayType(undefined)).toBeNull();
+    expect(extractArrayType('string')).toBeNull();
+  });
+
+  it('skips non-string elements in properties', () => {
+    expect(extractArrayType([42, null, 'array(double,-1)'])).toBe('array<double>');
   });
 });
 

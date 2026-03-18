@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -188,6 +189,28 @@ def parse_float_csv(value):
 # ---------------------------------------------------------------------------
 # Type formatting
 # ---------------------------------------------------------------------------
+
+def extract_array_type(properties):
+    """Scan a column's properties list for an ``array(TYPE,...)`` pattern.
+
+    Kinetica encodes array column info in the properties metadata rather than
+    the Avro type schema.  For example, an array column has properties like::
+
+        ["data", "array(string,-1)"]
+
+    Returns a human-readable type string such as ``"array<string>"``, or
+    ``None`` if the column is not an array type.
+    """
+    if not isinstance(properties, list):
+        return None
+    for p in properties:
+        if not isinstance(p, str):
+            continue
+        m = re.match(r"^array\((\w+)", p)
+        if m:
+            return f"array<{m.group(1)}>"
+    return None
+
 
 def format_avro_type(avro_type):
     """Format an Avro type descriptor into a human-readable string.

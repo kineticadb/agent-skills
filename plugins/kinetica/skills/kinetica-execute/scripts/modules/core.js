@@ -8,7 +8,7 @@
  */
 
 const fs = require('fs');
-const { die, out, columnarToRows, formatAvroType } = require('./helpers');
+const { die, out, columnarToRows, formatAvroType, extractArrayType } = require('./helpers');
 
 // ---------------------------------------------------------------------------
 // Commands
@@ -91,13 +91,21 @@ async function cmdDescribeTable(db, args) {
     }
   }
 
-  // Attach column properties if available
+  // Attach column properties and detect array types from properties metadata
   if (resp.properties && resp.properties.length > 0) {
     try {
-      const props = JSON.parse(resp.properties[0]);
-      columns = columns.map((col) =>
-        props[col.name] ? { ...col, properties: props[col.name] } : col
-      );
+      const raw = resp.properties[0];
+      const props = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      columns = columns.map((col) => {
+        if (!props[col.name]) return col;
+        const colProps = props[col.name];
+        const arrayType = extractArrayType(colProps);
+        return {
+          ...col,
+          ...(arrayType ? { type: arrayType } : {}),
+          properties: colProps,
+        };
+      });
     } catch (_) {
       /* ignore */
     }

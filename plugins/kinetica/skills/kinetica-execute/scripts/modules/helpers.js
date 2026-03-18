@@ -211,6 +211,30 @@ function formatAvroType(avroType) {
 }
 
 // ---------------------------------------------------------------------------
+// Property-based type extraction
+// ---------------------------------------------------------------------------
+
+/**
+ * Scan a column's properties array for an `array(TYPE,...)` pattern.
+ *
+ * Kinetica encodes array column info in the properties metadata rather than
+ * the Avro type schema. For example, an array column has properties like:
+ *   ["data", "array(string,-1)"]
+ *
+ * @param {*} properties - Column properties array from show_table response
+ * @returns {string|null} e.g. "array<string>", or null if not an array column
+ */
+function extractArrayType(properties) {
+  if (!Array.isArray(properties)) return null;
+  for (const p of properties) {
+    if (typeof p !== 'string') continue;
+    const m = p.match(/^array\((\w+)/);
+    if (m) return `array<${m[1]}>`;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 
@@ -225,4 +249,5 @@ module.exports = {
   parseCsvArg,
   parseFloatCsv,
   formatAvroType,
+  extractArrayType,
 };
