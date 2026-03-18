@@ -96,4 +96,4 @@ Then install fresh:
 
 ## License
 
-MIT
+Apache-2.0

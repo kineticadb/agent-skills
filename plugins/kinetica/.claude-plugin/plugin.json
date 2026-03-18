@@ -1,6 +1,6 @@
 {
   "name": "kineticadb",
-  "version": "1.0.30",
+  "version": "1.0.31",
   "description": "Kinetica knowledge skills — teaches AI agents to write correct SQL, build applications, administer, and interactively operate Kinetica's GPU-accelerated database.",
   "author": {
     "name": "Kinetica",
@@ -8,6 +8,6 @@
   },
   "homepage": "https://github.com/kineticadb/agent-skills",
   "repository": "https://github.com/kineticadb/agent-skills",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "keywords": ["database", "sql", "kinetica", "gpu", "analytics", "geospatial", "time-series", "graph", "vector-search", "python", "admin", "execute", "cli", "nodejs"]
 }
