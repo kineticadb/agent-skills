@@ -36,7 +36,7 @@ All four install together. Each SKILL.md has a `description` field that tells th
 
 ## How It Works
 
-Each skill is a directory with two files:
+Each skill is a directory with a standard layout:
 
 ```
 skills/kinetica-query/
