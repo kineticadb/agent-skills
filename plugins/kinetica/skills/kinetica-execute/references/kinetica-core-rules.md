@@ -31,6 +31,7 @@ These PostgreSQL features work in Kinetica without modification:
 7. **WITH RECURSIVE supported** — use `WITH RECURSIVE cte AS (base UNION ALL recursive) SELECT ...`. No infinite-recursion guard — ensure your recursive query terminates.
 8. **No trailing semicolons** — omit `;` at end of queries.
 9. **Default LIMIT 100** — always append unless user specifies otherwise.
+10. **Cannot ORDER BY array columns** — `VARCHAR[]`, `INTEGER[]`, and other array types cannot appear in `ORDER BY`. To sort by an array element, index it: `ORDER BY "col"[1]`. To sort rows containing arrays, use a non-array column instead.
 
 ## Nested Aggregates — Mandatory CTE Pattern
 
@@ -206,3 +207,4 @@ WHERE "table_schema" = 'my_schema' AND "table_name" = 'my_table'
 5. LIMIT applied?
 6. Column names verified against schema?
 7. Any destructive operation (DROP/DELETE/TRUNCATE)? → Confirm with user first
+8. ORDER BY on an array column (VARCHAR[], INTEGER[], etc.)? → Remove or index into it
