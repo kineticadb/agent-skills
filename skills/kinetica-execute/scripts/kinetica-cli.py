@@ -61,6 +61,19 @@ def _print_help():
             print(line)
 
 
+def _run_handler(fn, db, args):
+    """Run a command function with shared error handling."""
+    try:
+        fn(db, args)
+    except Exception as e:
+        msg = str(e)
+        if "Unable to sort on array column" in msg:
+            out({"error": msg, "fix": 'Remove the array column from ORDER BY, use a non-array column, or index into it: ORDER BY "col"[1]'})
+        else:
+            out({"error": msg})
+        sys.exit(1)
+
+
 def _dispatch_category(category, argv_rest):
     """Load a category module and dispatch to the requested action."""
     mod_path = CATEGORY_MODULES[category]
@@ -96,15 +109,7 @@ def _dispatch_category(category, argv_rest):
     args = action_parser.parse_args(argv_rest[1:])
 
     db = _connect_or_die()
-    try:
-        entry["fn"](db, args)
-    except Exception as e:
-        msg = str(e)
-        if "Unable to sort on array column" in msg:
-            out({"error": msg, "fix": 'Remove the array column from ORDER BY, use a non-array column, or index into it: ORDER BY "col"[1]'})
-        else:
-            out({"error": msg})
-        sys.exit(1)
+    _run_handler(entry["fn"], db, args)
 
 
 def _connect_or_die():
@@ -150,15 +155,7 @@ def main():
         die(f"Unknown command: {args.command}")
 
     db = _connect_or_die()
-    try:
-        fn(db, args)
-    except Exception as e:
-        msg = str(e)
-        if "Unable to sort on array column" in msg:
-            out({"error": msg, "fix": 'Remove the array column from ORDER BY, use a non-array column, or index into it: ORDER BY "col"[1]'})
-        else:
-            out({"error": msg})
-        sys.exit(1)
+    _run_handler(fn, db, args)
 
 
 if __name__ == "__main__":

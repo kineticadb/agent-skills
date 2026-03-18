@@ -78,9 +78,10 @@ See [references/udf-reference.md](references/udf-reference.md).
 ## Query Writing Guidelines
 
 0. **Graph check first** — If the question involves relationships (mutual, paths, connections, influence), run `graph show` before writing SQL. Use Cypher directly with edge/node labels — don't explore source tables first
-1. Always check column names and types before writing SQL — Kinetica is case-sensitive
-2. Quote schema-qualified table names: `"schema"."table"`
-3. Use LIMIT for exploration queries
-4. Use CTEs instead of nested subqueries with aggregates
-5. For date math, always use DATEDIFF/DATEADD — never subtract timestamps directly
-6. When in doubt, consult the relevant reference file for the domain
+1. Always run `describe-table` before writing SQL — check column names (case-sensitive) and types
+2. **Array columns** (type `array<...>`) cannot appear in ORDER BY, sort-by, or `get-records --sort-by` — use a non-array column or index into the array: `ORDER BY "col"[1]`
+3. Quote schema-qualified table names: `"schema"."table"`
+4. Use LIMIT for exploration queries
+5. Use CTEs instead of nested subqueries with aggregates
+6. For date math, always use DATEDIFF/DATEADD — never subtract timestamps directly
+7. When in doubt, consult the relevant reference file for the domain

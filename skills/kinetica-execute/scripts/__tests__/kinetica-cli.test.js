@@ -159,6 +159,27 @@ describe('category dispatch', () => {
 // ---------------------------------------------------------------------------
 
 describe('error handling', () => {
+  it('returns error+fix JSON for ORDER BY array column errors', async () => {
+    const dbOverride = createMockDb({
+      execute_sql_request: vi.fn().mockRejectedValue(
+        new Error('Unable to sort on array column "tags"'),
+      ),
+    });
+    const origExports = require.cache[gpudbPath].exports;
+    require.cache[gpudbPath].exports = function () {
+      return dbOverride;
+    };
+
+    await runCli(['query', 'SELECT * FROM t ORDER BY tags']);
+
+    const result = capturedOutput();
+    expect(result.error).toContain('Unable to sort on array column');
+    expect(result.fix).toContain('ORDER BY "col"[1]');
+    expect(exitSpy).toHaveBeenCalledWith(1);
+
+    require.cache[gpudbPath].exports = origExports;
+  });
+
   it('catches SDK errors and exits 1', async () => {
     // Make the SDK method fail
     const dbOverride = createMockDb({
