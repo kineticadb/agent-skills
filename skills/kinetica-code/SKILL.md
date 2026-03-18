@@ -1,6 +1,14 @@
 ---
 name: kinetica-code
-description: "Kinetica application development knowledge. Activate when the user is building Python applications that interact with Kinetica, using the Kinetica Python SDK, REST API, or building data pipelines."
+description: >-
+  Activate when the user is building Python applications that interact with Kinetica, using
+  the Kinetica Python SDK (gpudb) or REST API, or building data pipelines that connect to
+  a Kinetica GPU database. Also activate when the user mentions bulk data ingest, Kinetica
+  connectors, or the gpudb package.
+license: Apache-2.0
+metadata:
+  author: kinetica
+  version: "1.0.31"
 ---
 
 # Kinetica Application Development

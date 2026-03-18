@@ -1,6 +1,14 @@
 ---
 name: kinetica-admin
-description: "Kinetica database administration knowledge. Activate when the user is monitoring cluster health, diagnosing performance issues, managing resource groups, or optimizing Kinetica deployments."
+description: >-
+  Activate when the user is monitoring Kinetica cluster health, diagnosing query performance,
+  managing resource groups, configuring tiered storage, or optimizing Kinetica deployments.
+  Also activate for EXPLAIN plans, system table queries, security configuration, or access
+  control in Kinetica.
+license: Apache-2.0
+metadata:
+  author: kinetica
+  version: "1.0.31"
 ---
 
 # Kinetica Database Administration

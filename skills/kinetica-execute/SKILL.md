@@ -1,8 +1,18 @@
 ---
 name: kinetica-execute
-description: Use when interacting with a Kinetica GPU database — running SQL queries, exploring table schemas, graph analytics (shortest path, PageRank, TSP), geospatial filtering, server-side visualization, data import/export, or table monitoring via the Node.js or Python API
+description: >-
+  Use when interacting with a Kinetica GPU database — running SQL queries, exploring table
+  schemas, graph analytics (shortest path, PageRank, TSP), geospatial filtering, server-side
+  visualization, data import/export, or table monitoring. Provides an interactive CLI via
+  Node.js or Python. Activate even for simple tasks like checking table counts or running
+  a quick query against Kinetica.
+license: Apache-2.0
+compatibility: Requires Node.js 18+ or Python 3.8+ and network access to a Kinetica database
 argument-hint: <sql-or-action>
 user-invocable: true
+metadata:
+  author: kinetica
+  version: "1.0.31"
 ---
 
 # Kinetica DB Skill
@@ -531,6 +541,7 @@ For CLI equivalents, use `graph solve <name> --solver-type <TYPE>`. Results go t
 5. **GRAPH_TABLE() required for GROUP BY** — bare Cypher returns flat rows only
 6. **CONTAINS syntax**: `CONTAINS('search_term', column_name) = 1` — note the argument order
 7. **Filter during traversal, not after** — Apply WHERE clauses inline at each hop `(n:Label WHERE n.attr = 'val')` rather than in a post-MATCH WHERE block. On large graphs, post-match filtering generates an explosion of intermediate paths only to prune them afterward. Inline filters constrain path generation early and dramatically reduce work. **Variable-length paths** (`-[e]->{1,N}`) amplify this: keep the max hop count low (start with `{1,3}`) and always combine with inline label/attribute filters to bound the search space.
+8. **Same entity at both endpoints** — When the same node appears at both ends of a multi-hop pattern, use separate variables with individual WHERE filters: `(a:user WHERE a.NODE = 'tan')...(e:user WHERE e.NODE = 'tan')`. Do NOT reuse the same variable; each position in the MATCH path needs its own variable.
 
 #### Common Mistakes
 
@@ -544,6 +555,7 @@ For CLI equivalents, use `graph solve <name> --solver-type <TYPE>`. Results go t
 | `-[e]-` on directed graph | Fewer results than expected | Undirected edges need `force_undirected` hint |
 | Post-MATCH `WHERE` on large graph | Slow query / timeout | Move filters inline: `(n:Label WHERE n.attr = 'val')` to prune paths early |
 | Wide variable-length range `{1,30}` without filters | Timeout / out of memory | Start with `{1,3}`; add inline WHERE and label filters to bound expansion |
+| Same variable at both ends of path | Parse error or wrong results | Use separate variables with WHERE: `(a WHERE a.node='X')...(e WHERE e.node='X')` |
 
 > **Performance tiers:** Graphs < 10K edges handle most Cypher patterns well. At 10K–100K edges, always use inline WHERE filters and limit variable-length paths to `{1,3}`. Above 100K edges, prefer SOLVE_GRAPH over multi-hop Cypher, and use `graph_table` only if GRAPH_TABLE() aggregation is required.
 

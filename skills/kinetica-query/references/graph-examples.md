@@ -243,6 +243,8 @@ CREATE OR REPLACE GRAPH bluesky (
 
 ## Bluesky: Mutual Likes
 
+> **Pattern — same entity at both ends:** When the same user appears at start and end of traversal, use separate Cypher variables (`a` and `e`) with individual WHERE filters. Never reuse the same variable at both endpoints.
+
 ```sql
 -- Mutual likes: who likes Tan back?
 GRAPH bluesky

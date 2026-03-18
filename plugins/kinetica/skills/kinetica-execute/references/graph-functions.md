@@ -204,6 +204,7 @@ RETURN n1.node AS n1_name, e1.LABEL AS relationship, n2.node AS n2_name
 - **CRITICAL**: Return aliases must be unique — use `a.node AS originator`, not duplicate column names
 - When the graph's direction opposes your query traversal, flip the arrow: `()<-[]-()`
 - **CRITICAL**: MATCH requires a **single continuous path expression** — chain all nodes and edges into one linear pattern instead of splitting into separate comma-delimited patterns: `MATCH (a)-[e1]->(b)-[e2]->(c)` not `MATCH (a)-[e1]->(b), (b)-[e2]->(c)`
+- **CRITICAL**: When the same entity appears at both ends of a multi-hop pattern, use **separate variables** with individual WHERE filters — e.g., `(a:user WHERE a.NODE = 'tan')...(e:user WHERE e.NODE = 'tan')`. Do NOT reuse the same variable at both endpoints; Cypher variables are unique per position in the path.
 
 ### Pattern Elements
 | Syntax | Meaning |
@@ -606,3 +607,4 @@ EXECUTE FUNCTION MATCH_GRAPH(
 - All filtered attributes must exist in the original table definitions
 - Avoid `graph_table` option for graphs > 1K elements (high overhead)
 - Return aliases must be unique in Cypher queries
+- When the user asks about relationships, use Cypher directly with edge/node labels from `graph show` — don't explore source tables with `describe-table` first (this leads to SQL tunnel vision)

@@ -1,6 +1,14 @@
 ---
 name: kinetica-query
-description: "Kinetica SQL query knowledge. Activate when the user is writing analytical queries for Kinetica, asking about Kinetica-specific functions, or working with geospatial, time-series, graph, or vector data."
+description: >-
+  Activate when the user is writing analytical SQL queries for Kinetica, asking about
+  Kinetica-specific functions, or working with geospatial, time-series, graph, or vector
+  data — even if they just mention a GPU-accelerated database without naming Kinetica.
+  Covers SQL dialect differences from PostgreSQL, query patterns, and domain-specific functions.
+license: Apache-2.0
+metadata:
+  author: kinetica
+  version: "1.0.31"
 ---
 
 # Kinetica SQL Dialect
@@ -69,6 +77,7 @@ See [references/udf-reference.md](references/udf-reference.md).
 
 ## Query Writing Guidelines
 
+0. **Graph check first** — If the question involves relationships (mutual, paths, connections, influence), run `graph show` before writing SQL. Use Cypher directly with edge/node labels — don't explore source tables first
 1. Always check column names and types before writing SQL — Kinetica is case-sensitive
 2. Quote schema-qualified table names: `"schema"."table"`
 3. Use LIMIT for exploration queries
