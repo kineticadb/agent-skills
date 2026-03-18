@@ -8,7 +8,13 @@
  */
 
 const fs = require('fs');
-const { die, out, columnarToRows, formatAvroType, extractArrayType } = require('./helpers');
+const {
+  die,
+  out,
+  columnarToRows,
+  formatAvroType,
+  extractArrayType,
+} = require('./helpers');
 
 // ---------------------------------------------------------------------------
 // Commands

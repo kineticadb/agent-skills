@@ -229,3 +229,5 @@ def format_avro_type(avro_type):
         non_null = [t for t in avro_type if t != "null"]
         return "|".join(format_avro_type(t) for t in non_null)
     return str(avro_type)
+
+

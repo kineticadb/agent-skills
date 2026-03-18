@@ -572,3 +572,4 @@ describe('aggregate', () => {
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
 });
+
