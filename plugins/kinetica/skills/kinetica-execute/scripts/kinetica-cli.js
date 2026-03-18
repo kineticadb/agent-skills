@@ -67,7 +67,15 @@ async function runHandler(fn, db, args) {
   try {
     await fn(db, args);
   } catch (err) {
-    out({ error: err.message || String(err) });
+    const msg = err.message || String(err);
+    if (msg.includes('Unable to sort on array column')) {
+      out({
+        error: msg,
+        fix: 'Remove the array column from ORDER BY, use a non-array column, or index into it: ORDER BY "col"[1]',
+      });
+    } else {
+      out({ error: msg });
+    }
     process.exit(1);
   }
 }

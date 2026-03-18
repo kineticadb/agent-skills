@@ -15,6 +15,7 @@ from modules.helpers import (
     columnar_to_rows,
     die,
     extract_columnar_data,
+    format_avro_type,
     out,
 )
 
@@ -96,10 +97,7 @@ def cmd_describe_table(db, args):
         try:
             schema = json.loads(type_schemas[0])
             for f in schema.get("fields", []):
-                ftype = f.get("type", "")
-                if isinstance(ftype, list):
-                    ftype = "|".join(t for t in ftype if t != "null")
-                columns.append({"name": f["name"], "type": ftype})
+                columns.append({"name": f["name"], "type": format_avro_type(f.get("type", ""))})
         except (json.JSONDecodeError, KeyError):
             pass
 

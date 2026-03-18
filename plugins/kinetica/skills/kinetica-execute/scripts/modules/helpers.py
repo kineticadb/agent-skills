@@ -183,3 +183,26 @@ def parse_float_csv(value):
     if not value:
         return []
     return [float(s.strip()) for s in value.split(",")]
+
+
+# ---------------------------------------------------------------------------
+# Type formatting
+# ---------------------------------------------------------------------------
+
+def format_avro_type(avro_type):
+    """Format an Avro type descriptor into a human-readable string.
+
+    Handles simple strings ("string"), nullable unions (["string", "null"]),
+    array descriptors ({"type":"array","items":"string"}), and nested
+    combinations thereof.
+    """
+    if isinstance(avro_type, str):
+        return avro_type
+    if isinstance(avro_type, dict):
+        if avro_type.get("type") == "array":
+            return f"array<{format_avro_type(avro_type.get('items', ''))}>"
+        return avro_type.get("type", str(avro_type))
+    if isinstance(avro_type, list):
+        non_null = [t for t in avro_type if t != "null"]
+        return "|".join(format_avro_type(t) for t in non_null)
+    return str(avro_type)

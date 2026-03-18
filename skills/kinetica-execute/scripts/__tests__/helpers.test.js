@@ -35,6 +35,7 @@ const {
   parseArgs,
   parseCsvArg,
   parseFloatCsv,
+  formatAvroType,
 } = require('../modules/helpers');
 
 // ---------------------------------------------------------------------------
@@ -356,6 +357,52 @@ describe('parseFloatCsv', () => {
     const result = parseFloatCsv('abc');
     expect(result).toHaveLength(1);
     expect(Number.isNaN(result[0])).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatAvroType
+// ---------------------------------------------------------------------------
+
+describe('formatAvroType', () => {
+  it('returns simple string types as-is', () => {
+    expect(formatAvroType('string')).toBe('string');
+    expect(formatAvroType('int')).toBe('int');
+  });
+
+  it('strips null from nullable union types', () => {
+    expect(formatAvroType(['string', 'null'])).toBe('string');
+  });
+
+  it('formats array type descriptors', () => {
+    expect(formatAvroType({ type: 'array', items: 'string' })).toBe('array<string>');
+  });
+
+  it('formats nullable array types', () => {
+    expect(formatAvroType([{ type: 'array', items: 'int' }, 'null'])).toBe('array<int>');
+  });
+
+  it('formats nested array types', () => {
+    expect(
+      formatAvroType({ type: 'array', items: { type: 'array', items: 'string' } })
+    ).toBe('array<array<string>>');
+  });
+
+  it('falls back to .type for non-array object descriptors', () => {
+    expect(formatAvroType({ type: 'map', values: 'string' })).toBe('map');
+  });
+
+  it('falls back to JSON.stringify for object without .type', () => {
+    expect(formatAvroType({ foo: 'bar' })).toBe('{"foo":"bar"}');
+  });
+
+  it('converts non-string/non-object/non-array to string', () => {
+    expect(formatAvroType(42)).toBe('42');
+    expect(formatAvroType(null)).toBe('null');
+  });
+
+  it('joins multiple non-null types with pipe', () => {
+    expect(formatAvroType(['string', 'int'])).toBe('string|int');
   });
 });
 

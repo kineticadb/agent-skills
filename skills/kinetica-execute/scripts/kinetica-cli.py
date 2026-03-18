@@ -99,7 +99,11 @@ def _dispatch_category(category, argv_rest):
     try:
         entry["fn"](db, args)
     except Exception as e:
-        out({"error": str(e)})
+        msg = str(e)
+        if "Unable to sort on array column" in msg:
+            out({"error": msg, "fix": 'Remove the array column from ORDER BY, use a non-array column, or index into it: ORDER BY "col"[1]'})
+        else:
+            out({"error": msg})
         sys.exit(1)
 
 
@@ -149,7 +153,11 @@ def main():
     try:
         fn(db, args)
     except Exception as e:
-        out({"error": str(e)})
+        msg = str(e)
+        if "Unable to sort on array column" in msg:
+            out({"error": msg, "fix": 'Remove the array column from ORDER BY, use a non-array column, or index into it: ORDER BY "col"[1]'})
+        else:
+            out({"error": msg})
         sys.exit(1)
 
 

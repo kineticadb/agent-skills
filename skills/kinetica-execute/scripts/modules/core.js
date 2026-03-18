@@ -8,7 +8,7 @@
  */
 
 const fs = require('fs');
-const { die, out, columnarToRows } = require('./helpers');
+const { die, out, columnarToRows, formatAvroType } = require('./helpers');
 
 // ---------------------------------------------------------------------------
 // Commands
@@ -84,9 +84,7 @@ async function cmdDescribeTable(db, args) {
       const schema = JSON.parse(resp.type_schemas[0]);
       columns = (schema.fields || []).map((f) => ({
         name: f.name,
-        type: Array.isArray(f.type)
-          ? f.type.filter((t) => t !== 'null').join('|')
-          : f.type,
+        type: formatAvroType(f.type),
       }));
     } catch (_) {
       /* ignore parse error */

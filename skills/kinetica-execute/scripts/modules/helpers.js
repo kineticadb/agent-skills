@@ -184,6 +184,33 @@ function parseFloatCsv(value) {
 }
 
 // ---------------------------------------------------------------------------
+// Type formatting
+// ---------------------------------------------------------------------------
+
+/**
+ * Format an Avro type descriptor into a human-readable string.
+ *
+ * Handles simple strings ("string"), nullable unions (["string", "null"]),
+ * array descriptors ({"type":"array","items":"string"}), and nested
+ * combinations thereof.
+ *
+ * @param {string|object|Array} avroType
+ * @returns {string}
+ */
+function formatAvroType(avroType) {
+  if (typeof avroType === 'string') return avroType;
+  if (avroType && typeof avroType === 'object' && !Array.isArray(avroType)) {
+    if (avroType.type === 'array') return `array<${formatAvroType(avroType.items)}>`;
+    return avroType.type || JSON.stringify(avroType);
+  }
+  if (Array.isArray(avroType)) {
+    const nonNull = avroType.filter((t) => t !== 'null');
+    return nonNull.map(formatAvroType).join('|');
+  }
+  return String(avroType);
+}
+
+// ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 
@@ -197,4 +224,5 @@ module.exports = {
   parseArgs,
   parseCsvArg,
   parseFloatCsv,
+  formatAvroType,
 };
