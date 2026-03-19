@@ -112,7 +112,7 @@ ALTER GRAPH wiki_graph MODIFY (
 
 ```sql
 -- Create banking graph from vertex/edge tables with typed properties
-CREATE OR REPLACE DIRECTED GRAPH expero.banking_graph (
+CREATE OR REPLACE DIRECTED GRAPH "expero"."banking_graph" (
     NODES => INPUT_TABLES(
         (SELECT id AS NODE, label AS LABEL,
          "banking_transaction:amount" AS banking_transaction_amount,
@@ -121,11 +121,11 @@ CREATE OR REPLACE DIRECTED GRAPH expero.banking_graph (
          "party:party_name" AS party_name,
          "bank:bank_name" AS bank_name,
          "bank:risk_score" AS bank_risk_score
-         FROM expero.vertexes)
+         FROM "expero"."vertexes")
     ),
     EDGES => INPUT_TABLES(
         (SELECT id AS ID, source_name AS NODE1, target_name AS NODE2, label AS LABEL
-         FROM expero.edges)
+         FROM "expero"."edges")
     ),
     OPTIONS => KV_PAIRS(is_partitioned = 'false')
 )
@@ -134,7 +134,7 @@ CREATE OR REPLACE DIRECTED GRAPH expero.banking_graph (
 ## Banking: Wire Transfers with Risk Scores
 
 ```sql
-GRAPH expero.banking_graph
+GRAPH "expero"."banking_graph"
 MATCH (a:bank WHERE (a.NODE = 'd8d3cb99-0e3b-45b4-8221-79e8425065f3'))
       -[ab:performed]->(b:wire_message)-[bc:is_for_transaction]->(c:banking_transaction)
 RETURN a.bank_name AS bank, b.NODE AS wire, ab.LABEL AS ablabel,
@@ -147,7 +147,7 @@ RETURN a.bank_name AS bank, b.NODE AS wire, ab.LABEL AS ablabel,
 -- Aggregate wire transfers sorted by total amount
 SELECT wire, risk, ROUND(SUM(amount), 0) AS total
 FROM GRAPH_TABLE(
-    GRAPH expero.banking_graph
+    GRAPH "expero"."banking_graph"
     MATCH (a:bank WHERE (a.bank_name = 'Harvey Group'))
           -[ab:performed]->(b:wire_message)
           -[bc:is_for_transaction]->(c:banking_transaction)
@@ -162,7 +162,7 @@ GROUP BY 1, 2 ORDER BY 3 DESC
 
 ```sql
 -- High-risk wire transfers → transactions → internal accounts → people → devices
-GRAPH expero.banking_graph
+GRAPH "expero"."banking_graph"
 MATCH (a:bank WHERE (a.NODE = 'd8d3cb99-0e3b-45b4-8221-79e8425065f3'))
       -[ab:performed]->(b:wire_message WHERE b.wire_message_risk_score > 20)
       -[bc:is_for_transaction]->(c:banking_transaction)
@@ -178,7 +178,7 @@ RETURN DISTINCT g.party_name AS person, g.party_risk_score AS risk_score,
 SELECT person, bank, COUNT(DISTINCT device_id) AS device_count,
        MAX(risk_score) AS max_risk_score, ROUND(SUM(amount), 2) AS total_transaction
 FROM GRAPH_TABLE(
-    GRAPH expero.banking_graph
+    GRAPH "expero"."banking_graph"
     MATCH (a:bank WHERE (a.bank_risk_score > 95))
           -[ab:performed]->(b:wire_message WHERE b.wire_message_risk_score > 20)
           -[bc:is_for_transaction]->(c:banking_transaction)
@@ -194,7 +194,7 @@ GROUP BY 1, 2 ORDER BY 4 DESC
 
 ```sql
 -- Find transactions at banks with names matching 'ernser'
-GRAPH expero.banking_graph
+GRAPH "expero"."banking_graph"
 MATCH (a:bank WHERE (LOWER(a.bank_name) LIKE '%ernser%'))
       -[ab:performed]->(b:wire_message)-[bc:is_for_transaction]->(c:banking_transaction)
 RETURN a.bank_name AS bank, b.NODE AS wire,

@@ -14,7 +14,7 @@
     {
       "name": "kineticadb",
       "description": "Kinetica knowledge skills — SQL analytics, application development, database administration, and interactive execution for Kinetica's GPU-accelerated database.",
-      "version": "1.0.35",
+      "version": "1.0.36",
       "author": {
         "name": "Kinetica"
       },

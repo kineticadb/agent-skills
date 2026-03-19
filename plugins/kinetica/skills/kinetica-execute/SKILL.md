@@ -12,7 +12,7 @@ argument-hint: <sql-or-action>
 user-invocable: true
 metadata:
   author: kinetica
-  version: "1.0.35"
+  version: "1.0.36"
 ---
 
 # Kinetica DB Skill
@@ -534,7 +534,7 @@ For CLI equivalents, use `graph solve <name> --solver-type <TYPE>`. Results go t
 
 #### Cypher Rules (Must-Follow)
 
-1. **Always prefix with `GRAPH "name"`** — omitting this causes parse errors
+1. **Always prefix with `GRAPH "name"`** — omitting this causes parse errors. For schema-qualified graphs, quote each part separately: `GRAPH "schema"."graph_name"`, never `GRAPH "schema.graph_name"`
 2. **WHERE filters can only reference columns from the original table definitions** — you cannot filter on columns that weren't in the CREATE GRAPH source tables
 3. **Return aliases must be unique** — use `a.node AS source, b.node AS target`, never duplicate names
 4. **Arrow direction matters** — use `<-[]-` to flip traversal; for bidirectional on directed graphs, add hint: `/* KI_HINT_QUERY_GRAPH_ENDPOINT_OPTIONS (force_undirected, true) */`
@@ -556,6 +556,7 @@ For CLI equivalents, use `graph solve <name> --solver-type <TYPE>`. Results go t
 | Post-MATCH `WHERE` on large graph | Slow query / timeout | Move filters inline: `(n:Label WHERE n.attr = 'val')` to prune paths early |
 | Wide variable-length range `{1,30}` without filters | Timeout / out of memory | Start with `{1,3}`; add inline WHERE and label filters to bound expansion |
 | Same variable at both ends of path | Parse error or wrong results | Use separate variables with WHERE: `(a WHERE a.node='X')...(e WHERE e.node='X')` |
+| Schema-qualified graph in single quotes: `GRAPH "schema.name"` | Graph not found | Quote each part: `GRAPH "schema"."graph_name"` |
 
 > **Performance tiers:** Graphs < 10K edges handle most Cypher patterns well. At 10K–100K edges, always use inline WHERE filters and limit variable-length paths to `{1,3}`. Above 100K edges, prefer SOLVE_GRAPH over multi-hop Cypher, and use `graph_table` only if GRAPH_TABLE() aggregation is required.
 

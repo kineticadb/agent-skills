@@ -237,7 +237,7 @@ Wrap Cypher results in `GRAPH_TABLE()` to use standard SQL aggregation:
 SELECT person, bank, COUNT(DISTINCT device_id) AS devices,
        MAX(risk_score) AS max_risk, ROUND(SUM(amount), 2) AS total
 FROM GRAPH_TABLE(
-    GRAPH expero.banking_graph
+    GRAPH "expero"."banking_graph"
     MATCH (a:bank)-[ab:performed]->(b:wire_message WHERE b.wire_message_risk_score > 20)
           -[bc:is_for_transaction]->(c:banking_transaction)
           -[d:involved]->(e:internal_account)<-[f:manages]-(g:party)<-[h]-(i)-[]->(j)
@@ -254,7 +254,7 @@ This is the primary pattern for analytics on graph traversal results.
 
 ```sql
 -- LIKE filtering on node attributes
-GRAPH expero.banking_graph
+GRAPH "expero"."banking_graph"
 MATCH (a:bank WHERE LOWER(a.bank_name) LIKE '%ernser%')
       -[ab:performed]->(b:wire_message)-[bc:is_for_transaction]->(c:banking_transaction)
 RETURN a.bank_name AS bank, c.banking_transaction_amount
