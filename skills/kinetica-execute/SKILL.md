@@ -14,7 +14,7 @@ argument-hint: <sql-or-action>
 user-invocable: true
 metadata:
   author: kinetica
-  version: "1.0.37"
+  version: "1.0.38"
 ---
 
 # Kinetica DB Skill
@@ -83,7 +83,7 @@ fi
    - **Auth method** — Username/Password or OAuth Token
    - **Credentials** — username + password, or OAuth token, depending on the choice above
 4. **Warn** — Before writing anything, inform the user: *"I'll save these credentials to a local `.env` file (which is gitignored). OK to proceed?"* Use `AskUserQuestion` with Yes/No options. If the user declines, **do not write `.env`** — instead, prefix env vars inline on each CLI call for the remainder of the session (e.g., `KINETICA_DB_SKILL_URL=... python3 ... health`)
-5. **Write** — Create `<project_root>/.env` using the format from `<skill_path>/.env.template`, filling in the user-provided values. **Do NOT echo passwords or tokens in your response.** If the write fails (e.g., permission denied), show the user the exact file content they need to create manually (masking secrets with `***`)
+5. **Write** — Create `<project_root>/.env` using the format from `<skill_path>/.env.template`, filling in the user-provided values. **Do NOT echo passwords or tokens in your response.** Once `.env` is written successfully, **do not prefix env vars inline on CLI calls** — the CLI auto-loads `.env` from the project root, so inline prefixes are unnecessary and redundant. If the write fails (e.g., permission denied), show the user the exact file content they need to create manually (masking secrets with `***`)
 6. **Proceed** — Continue with the user's original request
 
 ## Dependency Setup
