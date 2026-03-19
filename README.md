@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
 [![CI](https://github.com/kineticadb/agent-skills/actions/workflows/check-refs.yml/badge.svg)](https://github.com/kineticadb/agent-skills/actions/workflows/check-refs.yml)
 
-Knowledge skills that teach AI coding agents to work with [Kinetica](https://www.kinetica.com), a real-time GPU-accelerated analytical database. The agent learns Kinetica's SQL dialect, Python SDK, admin operations, and interactive CLI — then activates the right skill automatically based on what you're doing.
+Knowledge skills that teach AI coding agents to work with [Kinetica](https://www.kinetica.com), a real-time GPU-accelerated analytical database. The agent learns Kinetica's SQL dialect, Python SDK, and interactive CLI — then activates the right skill automatically based on what you're doing.
 
 ## Table of Contents
 
@@ -57,35 +57,33 @@ npx skills add kineticadb/agent-skills
 
 ```bash
 # Pick the directory convention your agent uses:
-cp -r skills/kinetica-query .claude/skills/    # Claude Code
-cp -r skills/kinetica-query .cursor/skills/    # Cursor
-cp -r skills/kinetica-query .agents/skills/    # Codex, Windsurf, Roo, etc.
+cp -r skills/kinetica-execute .claude/skills/    # Claude Code
+cp -r skills/kinetica-execute .cursor/skills/    # Cursor
+cp -r skills/kinetica-execute .agents/skills/    # Codex, Windsurf, Roo, etc.
 ```
 
-Copy all four skill directories for the full experience, or just the ones you need.
+Copy both skill directories for the full experience, or just the one you need.
 
 ## <a id="skills"></a>🧠 Skills
 
 | Skill | Audience | What it teaches | Refs |
 | ----- | -------- | --------------- | ---- |
-| **kinetica-query** | 📊 Data analysts | SQL analytics — geospatial, time-series, vector search, graph, JSON | 15 |
 | **kinetica-code** | 💻 App developers | Python SDK (`gpudb`), REST API, data pipelines, embedded SQL | 7 |
-| **kinetica-admin** | 🔧 DBAs | System tables, EXPLAIN plans, resource groups, security, tiered storage | 7 |
-| **kinetica-execute** | ⚡ Interactive ops | Live CLI for SQL, graph analytics, geospatial, visualization, import/export | 16 |
+| **kinetica-execute** | ⚡ All users | SQL analytics, graph, geospatial, time-series, visualization, security & admin — with a live dual-runtime CLI | 17 |
 
-All four install together. Each `SKILL.md` has a `description` field in its frontmatter that tells the agent when to activate — a SQL question triggers `kinetica-query`, a Python SDK question triggers `kinetica-code`, a `describe this table` command triggers `kinetica-execute`, etc.
+Both install together. Each `SKILL.md` has a `description` field in its frontmatter that tells the agent when to activate — `kinetica-code` handles Python SDK and application development, while `kinetica-execute` covers everything else: SQL queries, analytics, administration, and interactive operations.
 
 ## <a id="quick-start"></a>🚀 Quick Start
 
 After installing, just ask your agent naturally. The right skill activates automatically:
 
-**📊 SQL analytics** (activates `kinetica-query`):
-> "Find all delivery trucks within 5 km of the warehouse in the last hour"
-
 **💻 Application code** (activates `kinetica-code`):
 > "Write a Python script that bulk-inserts sensor data using the gpudb SDK"
 
-**🔧 Admin tasks** (activates `kinetica-admin`):
+**📊 SQL analytics** (activates `kinetica-execute`):
+> "Find all delivery trucks within 5 km of the warehouse in the last hour"
+
+**🔧 Admin tasks** (activates `kinetica-execute`):
 > "Show me the EXPLAIN plan for this query and suggest index improvements"
 
 **⚡ Interactive operations** (activates `kinetica-execute`):
@@ -98,7 +96,7 @@ The `kinetica-execute` skill includes a dual-runtime CLI (Node.js + Python) that
 Each skill is a directory with a standard layout:
 
 ```text
-skills/kinetica-query/
+skills/kinetica-execute/
 ├── SKILL.md       # Entry point — always loaded into agent context
 ├── REFS           # Build manifest — lists which knowledge files this skill needs
 └── references/    # Detailed docs — agent reads on demand
@@ -125,22 +123,18 @@ knowledge/                    # Single source of truth
 
          ↓  build.sh reads REFS
 
-skills/kinetica-query/references/     ← 15 files (all domains)
 skills/kinetica-code/references/      ← 7 files  (SDK + DDL/DML)
-skills/kinetica-admin/references/     ← 7 files  (security + system tables)
-skills/kinetica-execute/references/   ← 16 files (all domains + API)
+skills/kinetica-execute/references/   ← 17 files (all domains + API + security)
 ```
 
-Each skill gets only the references relevant to its audience — a data analyst doesn't need security docs, and a DBA doesn't need vector search patterns.
+Each skill gets only the references relevant to its audience — `kinetica-code` focuses on SDK and DDL/DML docs for app developers, while `kinetica-execute` carries the full reference set to handle SQL analytics, geospatial, graph, security, and administration.
 
 ## <a id="project-structure"></a>📁 Project Structure
 
 ```text
 agent-skills/
 ├── skills/                  # Canonical skill definitions
-│   ├── kinetica-query/      #   SKILL.md + REFS + references/
-│   ├── kinetica-code/
-│   ├── kinetica-admin/
+│   ├── kinetica-code/       #   SKILL.md + REFS + references/
 │   └── kinetica-execute/    #   Also includes scripts/ (dual-runtime CLI)
 │       └── scripts/
 │           ├── kinetica-cli.js       # Node.js entry point
@@ -218,7 +212,7 @@ Remove the plugin from Claude Code:
 /plugin marketplace remove kinetica-skills
 ```
 
-**Upgrading from the old multi-plugin format?** If you previously installed `kinetica-query`, `kinetica-code`, or `kinetica-admin` as separate plugins, clean up first:
+**Upgrading from a previous install?** If you previously installed skills as separate plugins, clean up first:
 
 ```bash
 rm -rf ~/.claude/plugins/cache/kinetica-skills

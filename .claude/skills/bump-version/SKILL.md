@@ -1,7 +1,7 @@
 ---
 name: bump-version
 description: >-
-  Bump the Kinetica plugin version across all 6 source files (4 SKILL.md
+  Bump the Kinetica plugin version across all 4 source files (2 SKILL.md
   frontmatter + 2 JSON configs) and run build.sh to sync mirrored copies.
   Accepts patch (default), minor, or major.
 user-invocable: true
@@ -36,12 +36,12 @@ Apply semver rules:
 - `minor` → increment MINOR, reset PATCH to 0, keep MAJOR
 - `major` → increment MAJOR, reset MINOR and PATCH to 0
 
-### Step 4 — Edit the 6 source files
+### Step 4 — Edit the 4 source files
 
 Use the **Edit** tool (not Bash sed) to update each file. Match the OLD version
 string exactly and replace with the NEW version string.
 
-**4 SKILL.md files** — edit the `version:` line inside the YAML frontmatter
+**2 SKILL.md files** — edit the `version:` line inside the YAML frontmatter
 `metadata:` block. The line looks like:
 
 ```
@@ -55,10 +55,8 @@ Replace with:
 ```
 
 Files:
-1. `skills/kinetica-admin/SKILL.md`
-2. `skills/kinetica-code/SKILL.md`
-3. `skills/kinetica-execute/SKILL.md`
-4. `skills/kinetica-query/SKILL.md`
+1. `skills/kinetica-code/SKILL.md`
+2. `skills/kinetica-execute/SKILL.md`
 
 **marketplace.json** — edit ONLY the `plugins[0].version` field:
 
@@ -91,14 +89,14 @@ File: `plugins/kinetica/.claude-plugin/plugin.json`
 
 ### Step 5 — Run build
 
-Execute `./build.sh` from the repository root. This syncs the 6 source files
-into ~13 mirrored copies under `plugins/kinetica/skills/`.
+Execute `./build.sh` from the repository root. This syncs the 4 source files
+into mirrored copies under `plugins/kinetica/skills/`.
 
 ### Step 6 — Report results
 
 Print a summary:
 - Version change: `OLD_VERSION` → `NEW_VERSION`
-- List all 6 source files that were edited
+- List all 4 source files that were edited
 - Confirm build.sh completed successfully
 - Remind the user: "Changes are staged but **not committed**. Run `/commit` or
   `git commit` when ready."

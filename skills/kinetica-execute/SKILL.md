@@ -5,7 +5,9 @@ description: >-
   schemas, graph analytics (shortest path, PageRank, TSP), geospatial filtering, server-side
   visualization, data import/export, or table monitoring. Provides an interactive CLI via
   Node.js or Python. Activate even for simple tasks like checking table counts or running
-  a quick query against Kinetica.
+  a quick query against Kinetica. Also covers SQL analytics (geospatial, time-series,
+  graph, vector search), EXPLAIN plans, system table queries, security configuration,
+  and database administration.
 license: Apache-2.0
 compatibility: Requires Node.js 18+ or Python 3.8+ and network access to a Kinetica database
 argument-hint: <sql-or-action>
@@ -793,6 +795,10 @@ See [references/graph-functions.md](references/graph-functions.md) and [referenc
 User-Defined Functions (Python), scheduled SQL procedures, built-in ML (PREDICT, OUTLIERS),
 and Docker model management.
 See [references/udf-reference.md](references/udf-reference.md).
+
+### Security & Administration
+Users, roles, GRANT/REVOKE, row/column security, resource groups, and tier management.
+See [references/security-reference.md](references/security-reference.md).
 
 ## Query Writing Guidelines
 
