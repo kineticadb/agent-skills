@@ -8,18 +8,18 @@ Knowledge skills that teach AI coding agents to work with [Kinetica](https://www
 
 ## Table of Contents
 
-- [Supported Platforms](#supported-platforms)
-- [Install](#install)
-- [Skills](#skills)
-- [Quick Start](#quick-start)
-- [How It Works](#how-it-works)
-- [Project Structure](#project-structure)
-- [Development](#development)
-- [Contributing](#contributing)
-- [Uninstall / Reset](#uninstall--reset)
-- [License](#license)
+- [🖥️ Supported Platforms](#supported-platforms)
+- [📦 Install](#install)
+- [🧠 Skills](#skills)
+- [🚀 Quick Start](#quick-start)
+- [⚙️ How It Works](#how-it-works)
+- [📁 Project Structure](#project-structure)
+- [🛠️ Development](#development)
+- [🤝 Contributing](#contributing)
+- [🧹 Uninstall / Reset](#uninstall--reset)
+- [📄 License](#license)
 
-## Supported Platforms
+## 🖥️ Supported Platforms
 
 Works with any agent that supports the skills directory convention:
 
@@ -38,22 +38,22 @@ Works with any agent that supports the skills directory convention:
 | **Amazon Q** | Manual copy to `.agents/skills/` |
 | Others | Any agent that reads `SKILL.md` files from a skills directory |
 
-## Install
+## 📦 Install
 
-**Universal** (auto-detects your agent):
+**🌐 Universal** (auto-detects your agent):
 
 ```bash
 npx skills add kineticadb/agent-skills
 ```
 
-**Claude Code** (marketplace):
+**🤖 Claude Code** (marketplace):
 
 ```bash
 /plugin marketplace add kineticadb/agent-skills
 /plugin install kineticadb@kinetica-skills
 ```
 
-**Manual** (any agent):
+**📋 Manual** (any agent):
 
 ```bash
 # Pick the directory convention your agent uses:
@@ -64,36 +64,36 @@ cp -r skills/kinetica-query .agents/skills/    # Codex, Windsurf, Roo, etc.
 
 Copy all four skill directories for the full experience, or just the ones you need.
 
-## Skills
+## 🧠 Skills
 
 | Skill | Audience | What it teaches | Refs |
 | ----- | -------- | --------------- | ---- |
-| **kinetica-query** | Data analysts | SQL analytics — geospatial, time-series, vector search, graph, JSON | 15 |
-| **kinetica-code** | App developers | Python SDK (`gpudb`), REST API, data pipelines, embedded SQL | 7 |
-| **kinetica-admin** | DBAs | System tables, EXPLAIN plans, resource groups, security, tiered storage | 7 |
-| **kinetica-execute** | Interactive ops | Live CLI for SQL, graph analytics, geospatial, visualization, import/export | 16 |
+| **kinetica-query** | 📊 Data analysts | SQL analytics — geospatial, time-series, vector search, graph, JSON | 15 |
+| **kinetica-code** | 💻 App developers | Python SDK (`gpudb`), REST API, data pipelines, embedded SQL | 7 |
+| **kinetica-admin** | 🔧 DBAs | System tables, EXPLAIN plans, resource groups, security, tiered storage | 7 |
+| **kinetica-execute** | ⚡ Interactive ops | Live CLI for SQL, graph analytics, geospatial, visualization, import/export | 16 |
 
 All four install together. Each `SKILL.md` has a `description` field in its frontmatter that tells the agent when to activate — a SQL question triggers `kinetica-query`, a Python SDK question triggers `kinetica-code`, a `describe this table` command triggers `kinetica-execute`, etc.
 
-## Quick Start
+## 🚀 Quick Start
 
 After installing, just ask your agent naturally. The right skill activates automatically:
 
-**SQL analytics** (activates `kinetica-query`):
+**📊 SQL analytics** (activates `kinetica-query`):
 > "Find all delivery trucks within 5 km of the warehouse in the last hour"
 
-**Application code** (activates `kinetica-code`):
+**💻 Application code** (activates `kinetica-code`):
 > "Write a Python script that bulk-inserts sensor data using the gpudb SDK"
 
-**Admin tasks** (activates `kinetica-admin`):
+**🔧 Admin tasks** (activates `kinetica-admin`):
 > "Show me the EXPLAIN plan for this query and suggest index improvements"
 
-**Interactive operations** (activates `kinetica-execute`):
+**⚡ Interactive operations** (activates `kinetica-execute`):
 > "Run `SELECT COUNT(*) FROM vehicle_tracks` against my Kinetica instance"
 
 The `kinetica-execute` skill includes a dual-runtime CLI (Node.js + Python) that connects to your database, runs queries, generates visualizations, and returns results directly in the chat.
 
-## How It Works
+## ⚙️ How It Works
 
 Each skill is a directory with a standard layout:
 
@@ -112,7 +112,7 @@ The architecture uses a **two-tier loading strategy**:
 
 This lazy-loading pattern keeps the agent fast for simple questions while providing deep knowledge for complex ones.
 
-### Knowledge Pipeline
+### 🔀 Knowledge Pipeline
 
 All reference files originate from a single `knowledge/` directory (17 source files, ~5,100 lines). The `build.sh` script distributes them to each skill based on its `REFS` manifest:
 
@@ -133,7 +133,7 @@ skills/kinetica-execute/references/   ← 16 files (all domains + API)
 
 Each skill gets only the references relevant to its audience — a data analyst doesn't need security docs, and a DBA doesn't need vector search patterns.
 
-## Project Structure
+## 📁 Project Structure
 
 ```text
 agent-skills/
@@ -164,15 +164,15 @@ agent-skills/
 └── LICENSE                  # Apache-2.0
 ```
 
-## Development
+## 🛠️ Development
 
-### Prerequisites
+### 📋 Prerequisites
 
 - **Node.js 18+** — required for the `kinetica-execute` CLI and tests
 - **Python 3.8–3.13** — optional alternative runtime for `kinetica-execute`
 - A running Kinetica instance (for integration tests)
 
-### Build
+### 🏗️ Build
 
 After editing files in `knowledge/` or changing a skill's `REFS` manifest:
 
@@ -182,7 +182,7 @@ After editing files in `knowledge/` or changing a skill's `REFS` manifest:
 
 This copies the referenced knowledge files into each skill's `references/` directory and mirrors the skills into `plugins/kinetica/` for the Claude Code marketplace.
 
-### Tests
+### 🧪 Tests
 
 Tests live in `skills/kinetica-execute/scripts/__tests__/` and use [Vitest](https://vitest.dev):
 
@@ -195,11 +195,11 @@ npm run test:coverage     # Run with coverage report
 npm run test:integration  # Run integration tests (requires live Kinetica)
 ```
 
-### CI
+### ✅ CI
 
 The GitHub Actions workflow (`.github/workflows/check-refs.yml`) runs on every pull request to verify that `build.sh` output matches what's committed — ensuring `knowledge/` and `references/` never drift out of sync.
 
-## Contributing
+## 🤝 Contributing
 
 1. **Edit knowledge** — Modify or add a `.md` file in `knowledge/`
 2. **Map to skills** — Add the filename to the relevant skill's `REFS` file in `skills/<name>/REFS`
@@ -210,7 +210,7 @@ The GitHub Actions workflow (`.github/workflows/check-refs.yml`) runs on every p
 
 The CI check will fail if `references/` are out of sync with `knowledge/`, so always run `build.sh` before pushing.
 
-## Uninstall / Reset
+## 🧹 Uninstall / Reset
 
 Remove the plugin from Claude Code:
 
@@ -234,6 +234,6 @@ Then install fresh:
 /plugin install kineticadb@kinetica-skills
 ```
 
-## License
+## 📄 License
 
 [Apache-2.0](LICENSE)
