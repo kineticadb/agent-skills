@@ -333,7 +333,7 @@ def cmd_heatmap(db, args):
 
     extra = {}
     if args.value_col:
-        extra["VALUE_ATTR"] = args.value_col
+        extra["VAL_ATTR"] = args.value_col
     if args.blur_radius is not None:
         extra["BLUR_RADIUS"] = str(args.blur_radius)
     if args.colormap:

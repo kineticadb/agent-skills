@@ -262,7 +262,7 @@ async function cmdHeatmap(db, args) {
 
   const extra = {};
   const valueCol = args.flags['value-col'];
-  if (valueCol) extra.VALUE_ATTR = valueCol;
+  if (valueCol) extra.VAL_ATTR = valueCol;
 
   const blurRadius = args.flags['blur-radius'];
   if (blurRadius) extra.BLUR_RADIUS = blurRadius;

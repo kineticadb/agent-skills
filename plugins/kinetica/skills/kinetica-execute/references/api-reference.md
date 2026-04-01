@@ -970,7 +970,7 @@ The `/wms` endpoint replaces the deprecated `visualize_image_heatmap` and `visua
 
 #### Style-Specific Parameters
 
-**heatmap:** `VALUE_ATTR`, `BLUR_RADIUS`, `COLORMAP` (jet, hot, viridis, plasma, etc.)
+**heatmap:** `VAL_ATTR`, `BLUR_RADIUS`, `COLORMAP` (jet, hot, viridis, plasma, etc.)
 
 **cb_raster:** `CB_ATTR`, `CB_VALS`, `POINTCOLORS`, `POINTSIZES`, `POINTSHAPES`
 
@@ -989,7 +989,7 @@ const buffer = await db.wms_request({
   STYLES: 'heatmap',
   X_ATTR: 'longitude',
   Y_ATTR: 'latitude',
-  VALUE_ATTR: 'temperature',
+  VAL_ATTR: 'temperature',
   BLUR_RADIUS: 5,
   COLORMAP: 'jet',
 });
@@ -1030,7 +1030,7 @@ params = {
     'STYLES': 'heatmap',
     'X_ATTR': 'longitude',
     'Y_ATTR': 'latitude',
-    'VALUE_ATTR': 'temperature',
+    'VAL_ATTR': 'temperature',
     'BLUR_RADIUS': '5',
     'COLORMAP': 'jet',
 }

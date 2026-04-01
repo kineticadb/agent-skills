@@ -234,7 +234,7 @@ describe('heatmap', () => {
         HEIGHT: 768,
         X_ATTR: 'lon',
         Y_ATTR: 'lat',
-        VALUE_ATTR: 'temp',
+        VAL_ATTR: 'temp',
         BLUR_RADIUS: '10',
         COLORMAP: 'viridis',
       })
