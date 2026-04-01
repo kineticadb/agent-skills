@@ -14,7 +14,7 @@ argument-hint: <sql-or-action>
 user-invocable: true
 metadata:
   author: kinetica
-  version: "1.0.38"
+  version: "1.0.39"
 ---
 
 # Kinetica DB Skill

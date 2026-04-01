@@ -949,7 +949,7 @@ resp = db.visualize_image_chart(
 # resp['image_data'] — base64-encoded PNG
 ```
 
-### WMS — Web Map Service (Heatmap, Class-break, Raster)
+### WMS — Web Map Service (Heatmap, Class-break, Raster, Contour, Labels)
 
 The `/wms` endpoint replaces the deprecated `visualize_image_heatmap` and `visualize_image_classbreak` endpoints. It returns raw PNG bytes (not base64).
 
@@ -962,17 +962,132 @@ The `/wms` endpoint replaces the deprecated `visualize_image_heatmap` and `visua
 | `SRS` | Yes | Spatial reference system (e.g. `EPSG:4326`) |
 | `LAYERS` | Yes | Table name |
 | `BBOX` | Yes | `minX,minY,maxX,maxY` |
-| `WIDTH` | No | Image width (default: 800) |
-| `HEIGHT` | No | Image height (default: 600) |
-| `STYLES` | No | Render style: `heatmap`, `cb_raster`, `raster`, etc. |
-| `X_ATTR` | No | X coordinate column name |
-| `Y_ATTR` | No | Y coordinate column name |
+| `WIDTH` | No | Image width in pixels, 64-8192 (default: 800) |
+| `HEIGHT` | No | Image height in pixels, 64-8192 (default: 600) |
+| `STYLES` | No | Render style: `heatmap`, `cb_raster`, `raster`, `contour`, `labels`, `isochrones` |
+| `X_ATTR` | No | X/longitude coordinate column (mutually exclusive with `GEO_ATTR`) |
+| `Y_ATTR` | No | Y/latitude coordinate column (mutually exclusive with `GEO_ATTR`) |
+| `GEO_ATTR` | No | WKT geometry column (mutually exclusive with `X_ATTR`/`Y_ATTR`) |
+| `TRANSPARENT` | No | Background transparency: `TRUE` or `FALSE` (default: FALSE — opaque black) |
+| `SYMBOL_ATTR` | No | Symbol attribute column |
 
 #### Style-Specific Parameters
 
-**heatmap:** `VAL_ATTR`, `BLUR_RADIUS`, `COLORMAP` (jet, hot, viridis, plasma, etc.)
+**heatmap:**
 
-**cb_raster:** `CB_ATTR`, `CB_VALS`, `POINTCOLORS`, `POINTSIZES`, `POINTSHAPES`
+| Parameter | Description |
+|-----------|-------------|
+| `VAL_ATTR` | Value column for intensity (supports expressions: `count(*)`, `sum(col)`, `avg(col)`, `min(col)`, `max(col)`) |
+| `BLUR_RADIUS` | Blur radius 1-32 (default: auto) |
+| `COLORMAP` | Predefined color scheme: `jet`, `hot`, `viridis`, `plasma`, `terrain`, `accent`, etc. |
+| `GRADIENT_START_COLOR` | Custom gradient start color (hex RRGGBB) — overrides `COLORMAP` |
+| `GRADIENT_END_COLOR` | Custom gradient end color (hex RRGGBB) — overrides `COLORMAP` |
+| `REVERSE_COLORMAP` | Reverse colormap direction: `TRUE` or `FALSE` |
+
+**raster** (basic point/shape/track rendering):
+
+| Parameter | Description |
+|-----------|-------------|
+| `DOPOINTS` | Render points: `TRUE`/`FALSE` |
+| `DOSHAPES` | Render shapes: `TRUE`/`FALSE` |
+| `DOTRACKS` | Render tracks: `TRUE`/`FALSE` |
+| `DOSYMBOLOGY` | Render symbols: `TRUE`/`FALSE` |
+| `POINTCOLORS` | Point color (hex RRGGBB) |
+| `POINTSIZES` | Point size 0-20 |
+| `POINTSHAPES` | Point shape: `circle`, `square`, `diamond`, `hollowcircle`, `hollowsquare`, `hollowtriangle`, etc. |
+| `POINTOFFSET_X` | Horizontal point offset |
+| `POINTOFFSET_Y` | Vertical point offset |
+| `SHAPEFILLCOLORS` | Polygon fill color (hex RRGGBB) |
+| `SHAPELINECOLORS` | Shape outline color (hex RRGGBB) |
+| `SHAPELINEWIDTHS` | Shape line width |
+| `ANTIALIASING` | Smoothen WKT outlines: `TRUE`/`FALSE` |
+| `TRACKLINECOLORS` | Track line color (hex RRGGBB) |
+| `TRACKLINEWIDTHS` | Track line width |
+| `TRACKHEADCOLORS` | Track head marker color |
+| `TRACKHEADSIZES` | Track head marker size |
+| `TRACKHEADSHAPES` | Track head marker shape |
+| `TRACKMARKERCOLORS` | Track point marker color |
+| `TRACKMARKERSIZES` | Track point marker size |
+| `TRACKMARKERSHAPES` | Track point marker shape |
+| `TRACK_ID_ATTR` | Track ID column |
+| `TRACK_ORDER_ATTR` | Track ordering column |
+| `HASHLINECOLORS` | Hash line color (hex RRGGBB) |
+| `HASHLINEWIDTHS` | Hash line width |
+| `HASHLINEINTERVALS` | Distance between hash lines |
+| `HASHLINELENS` | Hash line length |
+| `HASHLINEANGLES` | Hash line rotation angle |
+| `ORDER_LAYERS` | Render layers in specified order: `TRUE`/`FALSE` |
+
+**cb_raster** (class-break rendering):
+
+| Parameter | Description |
+|-----------|-------------|
+| `CB_ATTR` | Classification attribute column (required) |
+| `CB_VALS` | Comma-separated class break values or ranges |
+| `CB_DELIMITER` | Separator for class values (default: `,`) |
+| `POINTCOLORS` | Comma-separated colors per class (hex RRGGBB) |
+| `POINTSIZES` | Comma-separated point sizes per class |
+| `POINTSHAPES` | Comma-separated point shapes per class |
+| `ORDER_CLASSES` | Render classes in specified order: `TRUE`/`FALSE` |
+| `USE_POINT_RENDERER` | Render points larger than 1px: `TRUE`/`FALSE` |
+| `ALPHA_BLENDING` | Enable alpha blending: `TRUE`/`FALSE` |
+| `CB_POINTALPHA_ATTR` | Class break attribute for point alpha |
+| `CB_POINTALPHA_VALS` | Alpha value ranges |
+| `CB_POINTALPHAS` | Alpha opacity values 0-255 per class |
+| `CB_POINTCOLOR_ATTR` | Class break attribute for point color |
+| `CB_POINTCOLOR_VALS` | Point color value ranges |
+| `CB_POINTSIZE_ATTR` | Class break attribute for point size |
+| `CB_POINTSIZE_VALS` | Point size value ranges |
+| `CB_POINTSHAPE_ATTR` | Class break attribute for point shape |
+| `CB_POINTSHAPE_VALS` | Point shape value ranges |
+
+**contour** (isoline rendering via `GRIDDING_METHOD: INV_DST_POW`):
+
+| Parameter | Description |
+|-----------|-------------|
+| `GRIDDING_METHOD` | Must be `INV_DST_POW` |
+| `VAL_ATTR` | Value column for isoline calculation |
+| `NUM_LEVELS` | Number of isolines |
+| `MIN_LEVEL` | Minimum isoline value |
+| `MAX_LEVEL` | Maximum isoline value |
+| `ADJUST_LEVELS` | Auto-compute min/max from viewport: `TRUE`/`FALSE` |
+| `COLORMAP` | Color scheme for contours |
+| `COLOR` | Single isoline color (hex) |
+| `BG_COLOR` | Background color (hex RRGGBB or AARRGGBB) |
+| `LINE_SIZE` | Isoline thickness |
+| `GRID_SIZE` | X-axis grid subdivisions |
+| `SEARCH_RADIUS` | Neighborhood influence percentage |
+| `SMOOTHING_FACTOR` | Point contribution smoothing |
+| `RENDER_OUTPUT_GRID` | Show flooded-contour fill: `TRUE`/`FALSE` |
+| `ADD_LABELS` | Add value labels to isolines: `TRUE`/`FALSE` |
+| `LABELS_FONT_SIZE` | Label font size 4-48 |
+| `LABELS_FONT_FAMILY` | Label font family |
+| `ADJUST_GRID` | Auto-vary grid size: `TRUE`/`FALSE` |
+| `MIN_GRID_SIZE` | Lower grid size limit |
+| `MAX_GRID_SIZE` | Upper grid size limit |
+
+**labels** (text label overlay):
+
+| Parameter | Description |
+|-----------|-------------|
+| `LABEL_LAYER` | Source table for labels (required) |
+| `LABEL_TEXT_STRING` | Label text content (column name or expression) |
+| `LABEL_X_ATTR` | X position column |
+| `LABEL_Y_ATTR` | Y position column |
+| `LABEL_FONT` | Font spec: `"Name Style Size"` (e.g. `"Arial Bold 12"`) |
+| `LABEL_TEXT_COLOR` | Text color (hex RRGGBB) |
+| `LABEL_FILL_COLOR` | Box fill color (hex RRGGBB) |
+| `LABEL_LINE_COLOR` | Box/leader line color (hex RRGGBB) |
+| `LABEL_LINE_WIDTH` | Line thickness |
+| `LABEL_TEXT_ANGLE` | Label rotation in degrees |
+| `LABEL_TEXT_SCALE` | Text scaling factor |
+| `LABEL_DRAW_BOX` | Draw box around label: `TRUE`/`FALSE` |
+| `LABEL_DRAW_LEADER` | Draw leader line: `TRUE`/`FALSE` |
+| `LABEL_LEADER_X_ATTR` | Leader line X termination column |
+| `LABEL_LEADER_Y_ATTR` | Leader line Y termination column |
+| `LABEL_X_OFFSET` | Horizontal label offset |
+| `LABEL_Y_OFFSET` | Vertical label offset |
+| `LABEL_FILTER` | Boolean filter expression |
 
 #### Node.js
 
