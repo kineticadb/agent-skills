@@ -90,8 +90,8 @@ Renders intensity-weighted heat visualization.
 | `VAL_ATTR` | — | Column, expression, or aggregation (see below) | Value for intensity weighting |
 | `BLUR_RADIUS` | `5` | 1–32 | Gaussian blur radius |
 | `COLORMAP` | `jet` | See [Available Colormaps](#available-colormaps) | Predefined color scheme |
-| `GRADIENT_START_COLOR` | `000000` | `RRGGBB` or `AARRGGBB` | Custom gradient start (overrides `COLORMAP`) |
-| `GRADIENT_END_COLOR` | `000000` | `RRGGBB` or `AARRGGBB` | Custom gradient end (overrides `COLORMAP`) |
+| `GRADIENT_START_COLOR` | `000000` | `RRGGBB` or `AARRGGBB` | Custom gradient start (used only when `COLORMAP` is not set) |
+| `GRADIENT_END_COLOR` | `000000` | `RRGGBB` or `AARRGGBB` | Custom gradient end (used only when `COLORMAP` is not set) |
 | `REVERSE_COLORMAP` | `FALSE` | `TRUE`, `FALSE` | Reverse colormap direction |
 
 #### VAL_ATTR Expressions
