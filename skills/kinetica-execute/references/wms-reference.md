@@ -398,6 +398,10 @@ If fewer values than layers, defaults apply for unlisted layers.
 
 Labels and WKT shapes **cannot render in the same WMS call**. To overlay labels on shapes, make two separate requests and composite the PNG images.
 
+### Track Rendering Requires DOPOINTS
+
+When rendering tracks (`DOTRACKS=TRUE`), **never set `DOPOINTS` to `FALSE`** unless the user explicitly requests it. Track head markers rely on the point renderer — disabling points suppresses track heads entirely, producing tracks with no visible head indicator. Always leave `DOPOINTS` at its default (`TRUE`) for track rendering.
+
 ### Symbol Handling
 
 1. **Upload symbols** via the `/insert/symbol` endpoint (SVG path data or raw SVG bytes)
