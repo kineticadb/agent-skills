@@ -14,7 +14,7 @@ argument-hint: <sql-or-action>
 user-invocable: true
 metadata:
   author: kinetica
-  version: "1.0.39"
+  version: "1.0.40"
 ---
 
 # Kinetica DB Skill
@@ -432,6 +432,8 @@ Write a Node.js or Python script when the user needs:
 
 When generating code, read `<skill_path>/references/api-reference.md` for API patterns and examples in both languages.
 
+> **Before writing WMS visualization code:** read `references/wms-reference.md` for all rendering styles, parameters, defaults, and gotchas.
+
 **Multi-graph pipeline pattern** (for generated scripts): When a workflow requires create→solve→query or cross-graph analysis, chain the steps sequentially and query the solution table between steps:
 
 ```python
@@ -799,6 +801,10 @@ See [references/udf-reference.md](references/udf-reference.md).
 ### Security & Administration
 Users, roles, GRANT/REVOKE, row/column security, resource groups, and tier management.
 See [references/security-reference.md](references/security-reference.md).
+
+### WMS / Visualization
+Heatmap, raster, class-break, contour, label, and isochrone rendering via the `/wms` endpoint.
+See [references/wms-reference.md](references/wms-reference.md).
 
 ## Query Writing Guidelines
 
