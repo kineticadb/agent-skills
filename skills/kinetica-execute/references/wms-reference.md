@@ -1,7 +1,9 @@
 # Kinetica WMS Reference
 
-The `/wms` endpoint renders map tiles as PNG images. It replaces the deprecated
-`visualize_image_heatmap` and `visualize_image_classbreak` endpoints.
+The `/wms` endpoint generates PNG map-tile overlays from any table with x/y
+coordinates or WKT geometry columns. Six rendering styles are supported: raster
+(points, shapes, symbols, tracks), class-break raster (categorical/range-based),
+heatmap, contour, labels, and isochrones.
 Official docs: [WMS REST](https://docs.kinetica.com/7.2/api/rest/wms_rest/)
 
 **Response:** Raw PNG bytes (Buffer in Node.js, bytes in Python). Write directly to file — no base64 decoding needed.

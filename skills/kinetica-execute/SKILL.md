@@ -2,8 +2,9 @@
 name: kinetica-execute
 description: >-
   Use when interacting with a Kinetica GPU database — running SQL queries, exploring table
-  schemas, graph analytics (shortest path, PageRank, TSP), geospatial filtering, server-side
-  visualization, data import/export, or table monitoring. Provides an interactive CLI via
+  schemas, graph analytics (shortest path, PageRank, TSP), geospatial filtering, WMS map
+  tile rendering (heatmaps, contours, rasters, class-breaks, labels, isochrones from x/y
+  or WKT data), data import/export, or table monitoring. Provides an interactive CLI via
   Node.js or Python. Activate even for simple tasks like checking table counts or running
   a quick query against Kinetica. Also covers SQL analytics (geospatial, time-series,
   graph, vector search), EXPLAIN plans, system table queries, security configuration,
@@ -14,7 +15,7 @@ argument-hint: <sql-or-action>
 user-invocable: true
 metadata:
   author: kinetica
-  version: "1.0.40"
+  version: "1.0.41"
 ---
 
 # Kinetica DB Skill
