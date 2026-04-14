@@ -151,6 +151,33 @@ Response (top level)
 
 > **`fromjson` selectivity:** After parsing `data_str`, only `type_schemas` elements (Avro schema strings) need another `fromjson`. Other fields — `table_names`, `properties`, `sizes`, `additional_info` — are already native JSON objects/arrays.
 
+### Extracting data with Python (when `jq` is unavailable)
+
+**SQL results — rows as named objects:**
+```bash
+curl ... | python3 -c "
+import sys, json
+r = json.load(sys.stdin)
+if r.get('status') == 'ERROR': print(json.dumps({'error': r['message']})); sys.exit(1)
+meta = json.loads(r['data_str'])
+d = json.loads(meta['json_encoded_response'])
+headers = d['column_headers']
+rows = [{h: d[f'column_{j+1}'][i] for j, h in enumerate(headers)} for i in range(len(d['column_1']))]
+print(json.dumps({'total': meta['total_number_of_records'], 'records': rows}, indent=2))
+"
+```
+
+**Show table — schema inspection:**
+```bash
+curl ... | python3 -c "
+import sys, json
+r = json.load(sys.stdin)
+meta = json.loads(r['data_str'])
+schema = json.loads(meta['type_schemas'][0])
+print(json.dumps({'table': meta['table_names'][0], 'columns': [{'name': f['name'], 'type': f['type']} for f in schema['fields']]}, indent=2))
+"
+```
+
 ### Extracting data with `jq`
 
 **Basic — parse `data_str` metadata:**
