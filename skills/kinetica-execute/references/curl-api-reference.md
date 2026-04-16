@@ -27,16 +27,7 @@ done < .env
 
 **OAuth Bearer token (preferred when available):**
 ```bash
-# Load credentials (must be in same Bash call — env vars don't persist)
-while IFS= read -r line || [[ -n "$line" ]]; do
-  [[ "$line" =~ ^[[:space:]]*# ]] || [[ -z "$line" ]] && continue
-  key="${line%%=*}"; val="${line#*=}"
-  if [[ "${val:0:1}" == "'" && "${val: -1}" == "'" ]] || \
-     [[ "${val:0:1}" == '"' && "${val: -1}" == '"' ]]; then
-    val="${val:1:${#val}-2}"
-  fi
-  export "$key=$val"
-done < .env
+# Load .env (see "Loading .env safely" above — must be in same Bash call)
 
 curl -X POST -k \
   -H "Authorization: Bearer $KINETICA_DB_SKILL_OAUTH_TOKEN" \
@@ -47,16 +38,7 @@ curl -X POST -k \
 
 **Basic Auth via Authorization header (preferred for username/password):**
 ```bash
-# Load credentials + base64-encode (must be in same Bash call — env vars don't persist)
-while IFS= read -r line || [[ -n "$line" ]]; do
-  [[ "$line" =~ ^[[:space:]]*# ]] || [[ -z "$line" ]] && continue
-  key="${line%%=*}"; val="${line#*=}"
-  if [[ "${val:0:1}" == "'" && "${val: -1}" == "'" ]] || \
-     [[ "${val:0:1}" == '"' && "${val: -1}" == '"' ]]; then
-    val="${val:1:${#val}-2}"
-  fi
-  export "$key=$val"
-done < .env
+# Load .env (see "Loading .env safely" above — must be in same Bash call)
 
 AUTH=$(printf '%s:%s' "$KINETICA_DB_SKILL_USER" "$KINETICA_DB_SKILL_PASS" | base64)
 
@@ -79,7 +61,7 @@ curl -X POST -k \
 
 | Endpoint | Example body |
 |----------|-------------|
-| `/execute/sql` | `{"statement": "SELECT 1", "offset": 0, "limit": 100, "encoding": "json", "options": {}}` |
+| `/execute/sql` | `{"statement": "SELECT 1", "offset": 0, "limit": 100, "encoding": "json", "options": {}}` — `encoding: "json"` is **required** for the `json_encoded_response` field to appear; without it, column data returns in binary |
 | `/show/table` | `{"table_name": "*", "options": {"get_sizes": "true"}}` |
 | `/show/graph` | `{"graph_name": "*", "options": {}}` |
 | `/insert/records/json?table_name=T` | `[{"col1": "val1"}]` (array of records as body) |
@@ -89,16 +71,7 @@ curl -X POST -k \
 ## Example: Execute SQL
 
 ```bash
-# Load credentials + base64-encode (must be in same Bash call — env vars don't persist)
-while IFS= read -r line || [[ -n "$line" ]]; do
-  [[ "$line" =~ ^[[:space:]]*# ]] || [[ -z "$line" ]] && continue
-  key="${line%%=*}"; val="${line#*=}"
-  if [[ "${val:0:1}" == "'" && "${val: -1}" == "'" ]] || \
-     [[ "${val:0:1}" == '"' && "${val: -1}" == '"' ]]; then
-    val="${val:1:${#val}-2}"
-  fi
-  export "$key=$val"
-done < .env
+# Load .env (see "Loading .env safely" above — must be in same Bash call)
 
 AUTH=$(printf '%s:%s' "$KINETICA_DB_SKILL_USER" "$KINETICA_DB_SKILL_PASS" | base64)
 
@@ -149,6 +122,28 @@ Response (top level)
     └─ type_schemas: ["{"type":"record",...}", ...]      ← double-encoded strings → need fromjson
 ```
 
+**Parsed response structure (/show/graph):**
+```
+Response (top level)
+├─ status: "OK"
+└─ data_str: (JSON string → parse to get metadata)
+    ├─ graph_names: ["my_graph"]
+    ├─ directed: [true]
+    ├─ num_nodes: [1500]
+    ├─ num_edges: [3200]
+    └─ (additional fields: original_request, etc.)
+```
+
+**Response structure (/insert/records/json):**
+```
+Response (top level)
+├─ status: "OK"
+├─ count_inserted: 5
+├─ count_updated: 0
+└─ count_skipped: 0
+```
+> Note: `/insert/records/json` returns counts at the top level — no `data_str` parsing needed.
+
 > **`fromjson` selectivity:** After parsing `data_str`, only `type_schemas` elements (Avro schema strings) need another `fromjson`. Other fields — `table_names`, `properties`, `sizes`, `additional_info` — are already native JSON objects/arrays.
 
 ### Extracting data with Python (when `jq` is unavailable)
@@ -162,7 +157,8 @@ if r.get('status') == 'ERROR': print(json.dumps({'error': r['message']})); sys.e
 meta = json.loads(r['data_str'])
 d = json.loads(meta['json_encoded_response'])
 headers = d['column_headers']
-rows = [{h: d[f'column_{j+1}'][i] for j, h in enumerate(headers)} for i in range(len(d['column_1']))]
+n = len(d.get('column_1', []))
+rows = [{h: d[f'column_{j+1}'][i] for j, h in enumerate(headers)} for i in range(n)]
 print(json.dumps({'total': meta['total_number_of_records'], 'records': rows}, indent=2))
 "
 ```
@@ -243,5 +239,6 @@ curl ... | jq 'if .status == "ERROR" then {error: .message} else (.data_str | fr
 - **Never use `-u`** — it requires inlining credentials in the command string, which corrupts `!` and other characters at the Bash tool transport layer
 - **Include `options: {}`** — most endpoints require the options field even if empty
 - **Use the full URL** — include `/_gpudb/` prefix if connecting through a reverse proxy (e.g., `https://host/_gpudb/show/table`)
+- **curl returns exit 0 on HTTP errors** — by default, `curl` exits 0 even on 4xx/5xx responses. Always check the `status` field in the JSON response. Alternatively, add `--fail-with-body` (curl 7.76+) to get a non-zero exit code while still seeing the error body
 - **`data_str` is multi-layered** — the value is a JSON *string* containing metadata; for SQL results, column data is nested inside `json_encoded_response` (another JSON string requiring a second parse)
 - **Not everything inside `data_str` needs `fromjson`** — after parsing `data_str`, only `json_encoded_response` (SQL column data) and `type_schemas` elements (Avro schema strings) are double-encoded strings needing another `fromjson`. Other fields like `properties`, `additional_info`, `sizes`, and `table_names` are already native JSON — applying `fromjson` to them will error
