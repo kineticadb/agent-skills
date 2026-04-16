@@ -66,14 +66,22 @@ CREATE OR REPLACE TABLE wiki_graph_edges (
 
 ### Inserting Multi-Label Data
 
+Use `string_to_array()` for `VARCHAR[]` label columns:
+
 ```sql
--- string_to_array() for VARCHAR[] columns
 INSERT INTO wiki_graph_nodes(node, label, age) VALUES
 ('Jane', string_to_array('FEMALE,business', ','), 29);
 
--- ARRAY[...] literal syntax
+INSERT INTO wiki_graph_edges(node1, node2, label, met_time) VALUES
+('Jane', 'Bill',  string_to_array('Friend', ','), '1997-09-15');
+```
+
+You can also use `ARRAY[...]` literal syntax:
+
+```sql
 INSERT INTO news_nodes (node, label) VALUES
-('US Supreme Court', ARRAY['Organization', 'Judicial']);
+('US Supreme Court', ARRAY['Organization', 'Judicial']),
+('Chicago', ARRAY['Location']);
 ```
 
 ## Creating Graphs
@@ -204,7 +212,9 @@ RETURN n1.node AS n1_name, e1.LABEL AS relationship, n2.node AS n2_name
 - **CRITICAL**: Return aliases must be unique — use `a.node AS originator`, not duplicate column names
 - When the graph's direction opposes your query traversal, flip the arrow: `()<-[]-()`
 - **CRITICAL**: MATCH requires a **single continuous path expression** — chain all nodes and edges into one linear pattern instead of splitting into separate comma-delimited patterns: `MATCH (a)-[e1]->(b)-[e2]->(c)` not `MATCH (a)-[e1]->(b), (b)-[e2]->(c)`
-- **CRITICAL**: When the same entity appears at both ends of a multi-hop pattern, use **separate variables** with individual WHERE filters — e.g., `(a:user WHERE a.NODE = 'tan')...(e:user WHERE e.NODE = 'tan')`. Do NOT reuse the same variable at both endpoints; Cypher variables are unique per position in the path.
+- **CRITICAL**: When the same entity appears at both ends of a multi-hop path, use **separate variables** with WHERE clauses — do NOT reuse the same variable: `(a WHERE a.node = 'X')...(b WHERE b.node = 'X')` not `(a WHERE a.node = 'X')...(a)`
+- **Filter during traversal, not after** — apply `WHERE` inline at each hop `(n:Label WHERE n.attr = 'val')` rather than in a post-MATCH WHERE block. On large graphs, post-match filtering causes an explosion of intermediate paths. Inline filters constrain path generation early
+- **Variable-length paths** (`-[e]->{1,N}`) amplify path explosion: keep the max hop count low (start with `{1,3}`) and always combine with inline label/attribute filters
 
 ### Pattern Elements
 | Syntax | Meaning |
@@ -287,18 +297,18 @@ SELECT * FROM TABLE(
 
 ### Solver Types
 
-| Solver Type | Description |
-|-------------|-------------|
-| `SHORTEST_PATH` | Optimal path from source to destination (Dijkstra) |
-| `PAGE_RANK` | Node importance based on topology |
-| `ALLPATHS` | All paths between source and destination |
-| `MULTIPLE_ROUTING` | Traveling Salesman Problem (round-trip min cost) |
-| `CENTRALITY` | Betweenness centrality (node importance) |
-| `BACKHAUL_ROUTING` | Connect remote assets to backbone nodes |
-| `CLOSENESS` | Closeness centrality (inverse avg distance to all nodes) |
-| `INVERSE_SHORTEST_PATH` | Find nodes within cost threshold from a target |
-| `PROBABILITY_RANK` | Transition probability ranking from a source node |
-| `STATS_ALL` | Comprehensive graph statistics and cluster detection |
+| Solver Type | Description | Requires Weights |
+|-------------|-------------|:---:|
+| `SHORTEST_PATH` | Optimal path via Dijkstra. Supports upstream, batch, many-to-many, single source routing, and A* heuristics with min/max cost filters | Yes |
+| `PAGE_RANK` | Google's PageRank — probability of each node being visited based on graph topology | No |
+| `PROBABILITY_RANK` | Transitional probability (Hidden Markov) for each node based on edge weights as probabilities | Yes |
+| `CENTRALITY` | Betweenness centrality — measures how many shortest paths pass through a node | No |
+| `CLOSENESS` | Closeness centrality — sum of inverse shortest path costs from a node to all others | No |
+| `MULTIPLE_ROUTING` | Traveling Salesman Problem (round-trip min cost visiting all waypoints) | Yes |
+| `INVERSE_SHORTEST_PATH` | Finds optimal path cost for each destination to route back to source (service man routing / downstream) | Yes |
+| `BACKHAUL_ROUTING` | Connects remote asset nodes to fixed backbone nodes — optimizes return logistics | Yes |
+| `ALLPATHS` | Finds all reasonable (probable) paths between source-destination pairs within cost radius bounds | Optional |
+| `STATS_ALL` | Graph statistics: diameter, longest pairs, vertex valences, topology numbers, avg/max cluster sizes, weakly connected components (`STATS_CLUSTERS`), zero-degree nodes | No |
 
 ### SOLVE_GRAPH Examples
 
@@ -422,15 +432,21 @@ EXECUTE FUNCTION MATCH_GRAPH(
 
 | Method | Description |
 |--------|-------------|
-| `match_supply_demand` | Multi-step MSDO: cycles supply→demand until all satisfied |
-| `markov_chain` | Hidden Markov Model for GPS snap-to-road |
-| `match_charging_stations` | Optimal path across EV charging stations |
-| `match_isochrone` | Reachability limits (isochrone polygons) |
-| `match_od_pairs` | Origin-destination pair routing with WKT points |
-| `match_batch_solves` | Batch shortest path processing for multiple pairs |
-| `match_clusters` | Louvain community detection (graph clustering) |
-| `match_loops` | Eulerian closed loop detection |
-| `match_similarity` | Jaccard vertex similarity scoring |
+| `markov_chain` | GPS snap-to-road using Hidden Markov Model (HMM) with adaptive kernel. **Patented.** |
+| `match_od_pairs` | Finds probable paths between origin-destination pairs under cost constraints |
+| `match_batch_solves` | Batch shortest path solves for large numbers of source-destination pairs |
+| `match_supply_demand` | Multi-step minimum-cost demand-supply optimization (MSDO) via MIP. **Patented.** Supports multi-modal transport, spec matching, partial loading |
+| `match_loops` | Finds closed Eulerian loops per graph node with unlimited hops. **Patented.** Good for money laundering ring detection |
+| `match_charging_stations` | Optimal path across EV charging stations with range constraints |
+| `match_isochrone` | Reachability limits (isochrone contours) from source nodes within cost thresholds |
+| `match_similarity` | Computes Jaccard similarity scores between vertex pairs and n-level intersections within m hops |
+| `match_pickup_dropoff` | Optimal scheduling for pick-up and drop-off operations (Uber-like) |
+| `match_clusters` | Optimal clustering using Louvain modularity. Also supports Recursive Spectral Bisection (RSB) |
+| `match_pattern` | Finds topological patterns in the graph |
+| `match_embedding` | Creates vector node embeddings for graph ML |
+| `match_route_detour` | Computes detour costs for nearby stations at a mark point along each source-target route |
+
+> **Important**: Always `DROP TABLE IF EXISTS <solution_table>` before re-running MATCH_GRAPH — it does not auto-replace existing solution tables.
 
 ### MSDO Key Concepts
 - **Multi-step**: Works backward from final demand (sink) to find first accommodating supply (source); previous supplies become demand for next optimization run
@@ -523,20 +539,22 @@ EXECUTE FUNCTION MATCH_GRAPH(
 )
 ```
 
-**Batch shortest path** (`match_batch_solves`) — processes multiple shortest-path requests in a single batch call:
+**Batch shortest path** (`match_batch_solves`) — processes multiple OD shortest-path requests in a single batch call:
 
 ```sql
+DROP TABLE IF EXISTS batch_result;
 EXECUTE FUNCTION MATCH_GRAPH(
     GRAPH => 'road_network',
     SAMPLE_POINTS => INPUT_TABLES(
-        (SELECT 'nodeA' AS SAMPLE_NODE, 0 AS SAMPLE_BATCH_ID, 0 AS SAMPLE_ORDER),
-        (SELECT 'nodeB' AS SAMPLE_NODE, 0 AS SAMPLE_BATCH_ID, 1 AS SAMPLE_ORDER),
-        (SELECT 'nodeC' AS SAMPLE_NODE, 1 AS SAMPLE_BATCH_ID, 0 AS SAMPLE_ORDER),
-        (SELECT 'nodeD' AS SAMPLE_NODE, 1 AS SAMPLE_BATCH_ID, 1 AS SAMPLE_ORDER)
+        (SELECT 1 AS OD_ID,
+                ST_GEOMFROMTEXT('POINT(-89.155 42.212)') AS ORIGIN_WKTPOINT,
+                ST_GEOMFROMTEXT('POINT(-82.539 42.890)') AS DESTINATION_WKTPOINT)
     ),
     SOLVE_METHOD => 'match_batch_solves', SOLUTION_TABLE => 'batch_result'
 )
 ```
+
+> **Key identifiers for `match_batch_solves`**: Use `OD_ID` (not `ID`), `ORIGIN_WKTPOINT` (not `SOURCE_WKTPOINT`), `DESTINATION_WKTPOINT`. WKT points must use `ST_GEOMFROMTEXT()`. Solution table columns: `INDEX`, `SOURCE`, `TARGET`, `COST`, `PATH` (LINESTRING).
 
 **Community detection** (`match_clusters`) — identifies communities via Louvain modularity optimization:
 
@@ -607,4 +625,6 @@ EXECUTE FUNCTION MATCH_GRAPH(
 - All filtered attributes must exist in the original table definitions
 - Avoid `graph_table` option for graphs > 1K elements (high overhead)
 - Return aliases must be unique in Cypher queries
-- When the user asks about relationships, use Cypher directly with edge/node labels from `graph show` — don't explore source tables with `describe-table` first (this leads to SQL tunnel vision)
+- When the user asks about relationships, use Cypher directly with edge/node labels — don't explore source tables with `describe-table` first (this leads to SQL tunnel vision)
+- Use `DESCRIBE GRAPH *` SQL to list graphs rather than CLI `graph show`
+- Kinetica does not support `LIST()` or `GROUP_CONCAT()` — keep `GRAPH_TABLE()` queries simple with standard aggregates (COUNT, SUM, AVG, MAX, MIN)
