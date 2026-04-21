@@ -1,6 +1,6 @@
 # Kinetica Agent Skills
 
-[![Version](https://img.shields.io/badge/version-1.0.46-blue)](https://github.com/kineticadb/agent-skills)
+[![Version](https://img.shields.io/badge/version-1.0.47-blue)](https://github.com/kineticadb/agent-skills)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
 [![CI](https://github.com/kineticadb/agent-skills/actions/workflows/check-refs.yml/badge.svg)](https://github.com/kineticadb/agent-skills/actions/workflows/check-refs.yml)
 
