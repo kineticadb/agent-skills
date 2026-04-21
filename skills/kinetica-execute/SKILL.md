@@ -15,7 +15,7 @@ argument-hint: <sql-or-action>
 user-invocable: true
 metadata:
   author: kinetica
-  version: "1.0.46"
+  version: "1.0.47"
 ---
 
 # Kinetica DB Skill
@@ -802,6 +802,17 @@ See [references/udf-reference.md](references/udf-reference.md).
 ### Security & Administration
 Users, roles, GRANT/REVOKE, row/column security, resource groups, and tier management.
 See [references/security-reference.md](references/security-reference.md).
+
+### Schema Introspection & Virtual Catalogs
+For "what tables exist", "show columns / PK / FK", "who has access", "why did Z run slow",
+"which MV depends on what", tier/RAM/disk usage, or load-history error audits — query the
+virtual catalogs instead of describe-table loops or GRANT inspection commands. Both catalogs
+auto-filter by caller permissions.
+- `information_schema.*` — portable, standards-compliant (`TABLES`, `COLUMNS`, `SCHEMATA`,
+  `KEY_COLUMN_USAGE`, `OBJECT_PRIVILEGES`). See [references/virtual-catalog-ansi.md](references/virtual-catalog-ansi.md).
+- `ki_catalog.*` — Kinetica-specific depth (`ki_tiered_objects` via `outer_object`, `ki_depend`,
+  `ki_query_span_metrics_all`, `ki_rag_embeddings`, single-letter enum decoders). See
+  [references/virtual-catalog-kinetica.md](references/virtual-catalog-kinetica.md).
 
 ### WMS / Visualization
 Heatmap, raster, class-break, contour, label, and isochrone rendering via the `/wms` endpoint.
