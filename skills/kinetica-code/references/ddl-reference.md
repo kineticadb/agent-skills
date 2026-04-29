@@ -223,6 +223,10 @@ CREATE [OR REPLACE] MATERIALIZED VIEW "schema"."mv" AS (
 REFRESH MATERIALIZED VIEW "schema"."mv"
 ```
 
+For changes-only materialized views (only newly-inserted rows since last
+refresh) and full `REFRESH EVERY ... STARTING AT ... STOP AFTER` /
+`EXECUTE AS` grammar, see [delta-tables.md](delta-tables.md).
+
 ## External Tables
 
 ```sql
@@ -313,7 +317,10 @@ SHOW DATA SINK *
 
 ## Streams (Change Data Capture)
 
-Publish table changes to Kafka, webhooks, or local tables:
+Publish table changes to Kafka, webhooks, or local tables.
+Query-based streams (`ON QUERY (...)`) use the `dt` (delta) / `lt` (lookup)
+`LEFT SEMI JOIN` shape — see [delta-tables.md](delta-tables.md) for the
+full pattern and source-table restrictions.
 
 ```sql
 -- Simple CDC stream
