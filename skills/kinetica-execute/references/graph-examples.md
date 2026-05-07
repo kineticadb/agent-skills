@@ -537,3 +537,131 @@ MATCH (n1 WHERE wktpoint = ST_GEOMFROMTEXT('POINT(3 1)'))
       -[e1]->(n2)-[e2]->(n3)-[e3]->(n4:SPOKE)
 RETURN n1.node AS n1_node, n2.node AS n2_node, n3.node AS n3_node, n4.node AS n4_node
 ```
+
+---
+
+## Bitcoin: Bipartite Address ↔ Transaction Graph with JSON Unnesting
+
+```sql
+-- Unified nodes table: Transaction nodes + Address nodes from unnested JSON
+-- All inline from base table — zero JOINs, labels computed during unnest
+CREATE OR REPLACE TABLE goldsky.bitcoin_nodes (
+    NODE VARCHAR(256, shard_key) NOT NULL,
+    LABEL VARCHAR[] NOT NULL,
+    raw_type VARCHAR(64),
+    block_number LONG, block_timestamp LONG, fee LONG,
+    fee_rate_sat_vb FLOAT, input_count INT, output_count INT,
+    input_value LONG, output_value LONG
+);
+
+INSERT INTO goldsky.bitcoin_nodes
+-- Transaction nodes
+SELECT CAST(hash AS VARCHAR(256)),
+    string_to_array(CASE WHEN is_coinbase = 1 THEN 'Transaction_Coinbase' ELSE 'Transaction_Standard' END, ','),
+    NULL, block_number, block_timestamp, fee,
+    CASE WHEN virtual_size > 0 THEN FLOAT(fee) / virtual_size ELSE NULL END,
+    input_count, output_count, input_value, output_value
+FROM goldsky.bitcoin_transactions_kk
+UNION ALL
+-- Address nodes from inputs (nested unnest for addresses array inside each input)
+SELECT CAST(REGEXP_REPLACE(addr, '"', '') AS VARCHAR(256)),
+    string_to_array(
+        CASE REGEXP_REPLACE(SUBSTR(input_elem, POSITION('"type":"' IN input_elem) + 8,
+             POSITION('"' IN SUBSTR(input_elem, POSITION('"type":"' IN input_elem) + 8)) - 1), '"', '')
+            WHEN 'witness_v0_keyhash' THEN 'Address_P2WPKH'
+            WHEN 'witness_v1_taproot' THEN 'Address_P2TR'
+            WHEN 'pubkeyhash' THEN 'Address_P2PKH'
+            WHEN 'scripthash' THEN 'Address_P2SH'
+            ELSE 'Address_Nonstandard'
+        END, ','),
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
+FROM goldsky.bitcoin_transactions_kk t,
+     unnest_json_array(json(t.inputs)) AS input_elem,
+     unnest_json_array(json(SUBSTR(input_elem,
+         POSITION('"addresses":' IN input_elem) + 12,
+         POSITION(']' IN SUBSTR(input_elem, POSITION('"addresses":' IN input_elem) + 12))))) AS addr
+WHERE t.is_coinbase = 0;
+```
+
+## Bitcoin: Unified Edges with Unique Labels per Node-Pair
+
+```sql
+-- Unique edge labels enable instant ontology generation (no schema_full_search needed)
+-- Labels computed inline: FUNDS_<AddrShort>_<TxShort>, RECEIVES_<TxShort>_<AddrShort>
+CREATE OR REPLACE TABLE goldsky.bitcoin_edges (
+    NODE1 VARCHAR(256) NOT NULL, NODE2 VARCHAR(256) NOT NULL,
+    LABEL VARCHAR[] NOT NULL,
+    value_sats LONG, block_number LONG, block_timestamp LONG, addr_type VARCHAR(64)
+);
+
+INSERT INTO goldsky.bitcoin_edges
+-- FUNDS edges (Address → Transaction) — label includes both node types
+SELECT CAST(REGEXP_REPLACE(addr, '"', '') AS VARCHAR(256)),
+    CAST(t.hash AS VARCHAR(256)),
+    string_to_array('FUNDS_' ||
+        CASE REGEXP_REPLACE(SUBSTR(input_elem, POSITION('"type":"' IN input_elem) + 8,
+             POSITION('"' IN SUBSTR(input_elem, POSITION('"type":"' IN input_elem) + 8)) - 1), '"', '')
+            WHEN 'witness_v0_keyhash' THEN 'P2WPKH' WHEN 'witness_v1_taproot' THEN 'P2TR'
+            WHEN 'pubkeyhash' THEN 'P2PKH' WHEN 'scripthash' THEN 'P2SH' ELSE 'Nonstandard'
+        END || '_TxStandard', ','),
+    LONG(REGEXP_REPLACE(SUBSTR(input_elem, POSITION('"value":' IN input_elem) + 8,
+         POSITION('}' IN SUBSTR(input_elem, POSITION('"value":' IN input_elem) + 8)) - 1), '[^0-9]', '')),
+    t.block_number, t.block_timestamp, NULL
+FROM goldsky.bitcoin_transactions_kk t,
+     unnest_json_array(json(t.inputs)) AS input_elem,
+     unnest_json_array(json(SUBSTR(input_elem,
+         POSITION('"addresses":' IN input_elem) + 12,
+         POSITION(']' IN SUBSTR(input_elem, POSITION('"addresses":' IN input_elem) + 12))))) AS addr
+WHERE t.is_coinbase = 0;
+```
+
+## Bitcoin: Dynamic Graph with Table Monitor
+
+```sql
+-- Graph from regular tables with table monitor — auto-updates on INSERT
+CREATE OR REPLACE DIRECTED GRAPH goldsky.bitcoin_graph (
+    NODES => INPUT_TABLES((SELECT * FROM goldsky.bitcoin_nodes)),
+    EDGES => INPUT_TABLES((SELECT * FROM goldsky.bitcoin_edges)),
+    OPTIONS => KV_PAIRS(merge_tolerance = '0', add_table_monitor = 'true')
+);
+
+-- Scheduled procedure processes new blocks incrementally
+CREATE OR REPLACE PROCEDURE goldsky.BitcoinGraphUpdateProc
+BEGIN
+    CREATE OR REPLACE TEMP TABLE goldsky.Interval AS
+        SELECT (MAX(intervalEndBlock) - 1) AS startBlk,
+               (SELECT MAX(block_number) FROM goldsky.bitcoin_transactions_kk) AS endBlk
+        FROM goldsky.bitcoin_ProcWorker WHERE workerId = 'BitcoinGraphUpdateProc';
+
+    INSERT INTO goldsky.bitcoin_ProcWorker(intervalStartBlock, intervalEndBlock, workerId)
+    SELECT startBlk, endBlk, 'BitcoinGraphUpdateProc' FROM goldsky.Interval;
+
+    -- Insert new nodes + edges filtered by block_number watermark
+    INSERT INTO goldsky.bitcoin_nodes SELECT ... FROM goldsky.bitcoin_transactions_kk
+    WHERE block_number BETWEEN (SELECT startBlk FROM goldsky.Interval) AND (SELECT endBlk FROM goldsky.Interval);
+
+    INSERT INTO goldsky.bitcoin_edges SELECT ... FROM goldsky.bitcoin_transactions_kk
+    WHERE block_number BETWEEN (SELECT startBlk FROM goldsky.Interval) AND (SELECT endBlk FROM goldsky.Interval);
+END
+EXECUTE FOR EVERY 30 SECONDS STARTING AT '2019-01-01 00:00:00';
+```
+
+## Bitcoin: Cypher Queries with Unique Edge Labels
+
+```sql
+-- Two-hop money flow with OLAP joins (fee, value from source tables)
+GRAPH goldsky.bitcoin_graph
+MATCH (a:Address_P2WPKH)-[e1:FUNDS_P2WPKH_TxStandard]->(t:Transaction_Standard)
+      -[e2:RECEIVES_TxStandard_P2TR]->(b:Address_P2TR)
+RETURN a.node AS sender, t.fee AS fee, e1.value_sats AS sent, e2.value_sats AS received
+LIMIT 10
+
+-- Address type distribution via GRAPH_TABLE
+SELECT addr_label, COUNT(*) AS cnt
+FROM GRAPH_TABLE(
+    GRAPH goldsky.bitcoin_graph
+    MATCH (a)-[e:FUNDS_P2WPKH_TxStandard]->(t:Transaction_Standard)
+    RETURN a.label AS addr_label
+)
+GROUP BY 1 ORDER BY 2 DESC
+```

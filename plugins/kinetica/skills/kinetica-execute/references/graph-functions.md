@@ -171,6 +171,158 @@ ALTER GRAPH wiki_graph MODIFY (
 | `add_table_monitor` | If `true`, graph updates dynamically on inserts to source tables |
 | `merge_tolerance` | Min separation between unique geospatial nodes (default `1.0E-5`) |
 | `label_delimiter` | Delimiter for label strings (default: `:`) |
+| `allow_multiple_edges` | If `false`, prevents duplicate edges between same node pair (default: `true`) |
+
+### Unified Node/Edge Tables for Cypher OLAP Joins
+
+**CRITICAL**: The Cypher query planner requires **one nodes table** and **one edges table** for OLAP joins to work. When you have multiple node types (e.g., Address + Transaction) or edge types (e.g., FUNDS + RECEIVES), UNION ALL them into a single table. Columns that don't apply to a particular type get NULL:
+
+```sql
+-- One unified nodes table — different types UNIONed with NULLs for missing columns
+CREATE TABLE my_nodes (node VARCHAR(256), label VARCHAR[] NOT NULL, attr1 FLOAT, attr2 VARCHAR, attr3 LONG);
+INSERT INTO my_nodes
+SELECT id AS node, string_to_array('TypeA', ',') AS label, rating AS attr1, desc AS attr2, NULL AS attr3 FROM table_a
+UNION ALL
+SELECT id AS node, string_to_array('TypeB', ',') AS label, NULL, NULL, count AS attr3 FROM table_b;
+
+-- One unified edges table — same pattern
+CREATE TABLE my_edges (node1 VARCHAR(256), node2 VARCHAR(256), label VARCHAR[] NOT NULL, value LONG, extra VARCHAR);
+INSERT INTO my_edges
+SELECT src, tgt, string_to_array('FUNDS', ','), amount, type FROM edge_table_a
+UNION ALL
+SELECT src, tgt, string_to_array('RECEIVES', ','), amount, type FROM edge_table_b;
+
+-- Graph from single tables
+CREATE OR REPLACE DIRECTED GRAPH my_graph (
+    NODES => INPUT_TABLES((SELECT * FROM my_nodes)),
+    EDGES => INPUT_TABLES((SELECT * FROM my_edges)),
+    OPTIONS => KV_PAIRS(add_table_monitor = 'true')
+);
+```
+
+All non-graph columns in these tables are available in Cypher `WHERE` and `RETURN` via implicit OLAP joins at query time.
+
+### Unique Edge Labels for Instant Ontology
+
+For fast ontology generation via `DESCRIBE GRAPH ... WITH OPTIONS(export_graph_schema = 'true')`, make each edge label unique to the (source_node_label, target_node_label) pair. This avoids requiring `schema_full_search = 'true'` which scans the entire graph:
+
+```sql
+-- Instead of generic 'FUNDS' for all address types:
+--   FUNDS_P2WPKH_TxStandard    (Address_P2WPKH → Transaction_Standard)
+--   FUNDS_P2TR_TxStandard      (Address_P2TR → Transaction_Standard)
+--   RECEIVES_TxStandard_P2WPKH (Transaction_Standard → Address_P2WPKH)
+--   RECEIVES_TxCoinbase_P2SH   (Transaction_Coinbase → Address_P2SH)
+
+-- Compute unique labels inline during INSERT (no JOINs):
+INSERT INTO my_edges
+SELECT addr, tx_hash,
+    string_to_array('FUNDS_' || addr_short || '_' || tx_short, ',') AS label,
+    value_sats, block_number
+FROM source_table ...
+```
+
+### JSON Array Unnesting
+
+Kinetica 7.2.x uses `unnest_json_array(json(...))` for JSON arrays. `JSON_EXTRACT_VALUE` may not be available in all versions:
+
+```sql
+-- Unnest a top-level JSON array column
+SELECT elem FROM my_table, unnest_json_array(json(json_string_col)) AS elem
+
+-- Nested unnest (e.g., addresses array inside each input element)
+SELECT REGEXP_REPLACE(addr, '"', '') AS address
+FROM my_table t,
+     unnest_json_array(json(t.inputs)) AS input_elem,
+     unnest_json_array(json(
+         SUBSTR(input_elem,
+             POSITION('"addresses":' IN input_elem) + 12,
+             POSITION(']' IN SUBSTR(input_elem, POSITION('"addresses":' IN input_elem) + 12))
+         )
+     )) AS addr
+
+-- Extract fields from unnested JSON via SUBSTR + POSITION (no JSON_EXTRACT needed)
+REGEXP_REPLACE(
+    SUBSTR(elem, POSITION('"type":"' IN elem) + 8,
+           POSITION('"' IN SUBSTR(elem, POSITION('"type":"' IN elem) + 8)) - 1),
+    '"', '') AS field_value
+```
+
+### Dynamic Graphs with Table Monitor and SQL Procedures
+
+For realtime/streaming graphs, use regular tables with `add_table_monitor` and a scheduled SQL procedure that processes new rows incrementally:
+
+```sql
+-- 1. Create regular node/edge tables (not materialized views — monitor can't watch MV internals)
+CREATE TABLE my_nodes (...) TIER STRATEGY (((VRAM 1, RAM 5, DISK0 5, PERSIST 5)));
+CREATE TABLE my_edges (...) TIER STRATEGY (((VRAM 1, RAM 5, DISK0 5, PERSIST 5)));
+
+-- 2. Watermark tracker for incremental processing
+CREATE REPLICATED TABLE my_ProcWorker (
+    workerId VARCHAR(32, dict) NOT NULL,
+    intervalStartTime BIGINT NOT NULL,
+    intervalEndTime BIGINT NOT NULL,
+    insertTs DATETIME NOT NULL DEFAULT NOW()
+);
+
+-- 3. Bulk load initial data, then create graph with monitor
+CREATE OR REPLACE DIRECTED GRAPH my_graph (
+    NODES => INPUT_TABLES((SELECT * FROM my_nodes)),
+    EDGES => INPUT_TABLES((SELECT * FROM my_edges)),
+    OPTIONS => KV_PAIRS(add_table_monitor = 'true')
+);
+
+-- 4. Scheduled procedure processes new rows since last watermark
+CREATE OR REPLACE PROCEDURE my_GraphUpdateProc
+BEGIN
+    CREATE OR REPLACE TEMP TABLE my_Interval AS
+        SELECT (MAX(intervalEndTime) - 5000000) AS intervalStartTime,
+               LONG(UNIX_TIMESTAMP(NOW())*1000000) AS intervalEndTime,
+               'GraphUpdateProc' AS workerId
+        FROM my_ProcWorker WHERE workerId = 'GraphUpdateProc';
+
+    INSERT INTO my_ProcWorker(intervalStartTime, intervalEndTime, workerId)
+    SELECT intervalStartTime, intervalEndTime, workerId FROM my_Interval;
+
+    -- Insert new nodes (filtered by watermark)
+    INSERT INTO my_nodes SELECT ... FROM source_table
+    WHERE time_col BETWEEN (SELECT intervalStartTime FROM my_Interval) AND (SELECT intervalEndTime FROM my_Interval);
+
+    -- Insert new edges (filtered by watermark)
+    INSERT INTO my_edges SELECT ... FROM source_table
+    WHERE time_col BETWEEN (SELECT intervalStartTime FROM my_Interval) AND (SELECT intervalEndTime FROM my_Interval);
+END
+EXECUTE FOR EVERY 30 SECONDS
+STARTING AT '2019-01-01 00:00:00';
+```
+
+The flow: new data arrives → procedure runs → INSERTs into node/edge tables → table monitor fires → graph auto-updates.
+
+**Two approaches for dynamic graphs:**
+
+**Option A — Regular tables + SQL procedure** (shown above): Best when source data requires complex transformations (e.g., JSON unnesting with `unnest_json_array`). The procedure runs on an interval, processes new rows, and INSERTs into the node/edge tables.
+
+**Option B — Materialized view + base table update**: The graph monitors the MV, and you INSERT into the MV's **base table** to trigger updates:
+
+```sql
+-- 1. Base table holds the processed data
+CREATE TABLE my_base_edges AS (SELECT * FROM raw_edges WHERE label = 'FUNDS');
+
+-- 2. MV on top of the base table
+CREATE OR REPLACE MATERIALIZED VIEW my_edges_mv REFRESH ON CHANGE AS
+SELECT id AS ID, source_name AS NODE1_NAME, target_name AS NODE2_NAME, label AS LABEL
+FROM my_base_edges;
+
+-- 3. Graph reads from MV with table monitor
+CREATE OR REPLACE DIRECTED GRAPH my_graph (
+    EDGES => INPUT_TABLE(SELECT ID, NODE1_NAME, NODE2_NAME, LABEL FROM my_edges_mv),
+    OPTIONS => KV_PAIRS(add_table_monitor = 'true')
+);
+
+-- 4. INSERT into the BASE TABLE → MV refreshes → graph updates implicitly
+INSERT INTO my_base_edges SELECT * FROM raw_edges WHERE label = 'FUNDS' AND id > last_id;
+```
+
+**Key distinction**: the monitor watches the MV, but you update the MV's **base table** (not the MV directly). Complex MVs with UNION ALL or `unnest_json_array` sourcing raw data may fail — keep the MV query simple (single-table SELECT) and do heavy transformations before inserting into the base table.
 
 ## ALTER GRAPH
 
@@ -628,3 +780,9 @@ EXECUTE FUNCTION MATCH_GRAPH(
 - When the user asks about relationships, use Cypher directly with edge/node labels — don't explore source tables with `describe-table` first (this leads to SQL tunnel vision)
 - Use `DESCRIBE GRAPH *` SQL to list graphs rather than CLI `graph show`
 - Kinetica does not support `LIST()` or `GROUP_CONCAT()` — keep `GRAPH_TABLE()` queries simple with standard aggregates (COUNT, SUM, AVG, MAX, MIN)
+- **One nodes table, one edges table** — UNION ALL different types into single tables with NULLs for missing columns; the Cypher planner needs this for OLAP joins
+- **Unique edge labels per node-label pair** — e.g., `FUNDS_P2WPKH_TxStandard` instead of generic `FUNDS`; enables instant ontology via `DESCRIBE GRAPH ... WITH OPTIONS(export_graph_schema = 'true')` without `schema_full_search`
+- **`add_table_monitor`** works on regular tables and simple MVs — for MVs, INSERT into the MV's **base table** to trigger updates; complex MVs (UNION ALL, unnest) may need the regular-table + SQL-procedure pattern instead
+- Use `unnest_json_array(json(col))` for JSON array columns; extract fields via `SUBSTR`+`POSITION`+`REGEXP_REPLACE` — `JSON_EXTRACT_VALUE` may not be available in all 7.2.x versions
+- At scale (100M+), compute all labels inline during unnest — never JOIN NxM tables for label derivation
+- All NODE columns (node, node1, node2) must have matching types (e.g., all `VARCHAR(256)`) across node and edge tables — use `CAST` when UNIONing

@@ -8,7 +8,7 @@ description: >-
 license: Apache-2.0
 metadata:
   author: kinetica
-  version: "1.0.48"
+  version: "1.0.49"
 ---
 
 # Kinetica Application Development
