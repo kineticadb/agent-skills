@@ -36,6 +36,7 @@ This skill includes core Kinetica SQL knowledge so you can embed queries in appl
 - See [references/sql-patterns.md](references/sql-patterns.md) for common query patterns
 - See [references/ddl-reference.md](references/ddl-reference.md) for DDL (table creation, data sources, external tables)
 - See [references/dml-reference.md](references/dml-reference.md) for DML (LOAD DATA, EXPORT, upsert)
+- See [references/delta-tables.md](references/delta-tables.md) for incremental "changes-only" materialized views (`KI_HINT_DELTA_TABLE` scoped hint, MV refresh grammar) and query-based streams (`CREATE STREAM ... ON QUERY` with `dt` / `lt` LEFT SEMI JOIN aliases) — insert-only semantics, regular-table sources only
 - See [references/udf-reference.md](references/udf-reference.md) for UDFs, procedures, Python environments, ML models
 
 ## Python SDK

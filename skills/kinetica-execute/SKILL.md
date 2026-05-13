@@ -770,6 +770,20 @@ CREATE TABLE with shard keys, partitioning, tier strategies, vector indexes.
 LOAD DATA for bulk ingestion, EXPORT for data extraction, upsert hints.
 See [references/ddl-reference.md](references/ddl-reference.md) and [references/dml-reference.md](references/dml-reference.md).
 
+### Materialized Views & Delta Tables
+For "incremental MV that only re-emits new rows", "change-data feed", "geofence /
+membership stream", or any "only show inserts since the last refresh" request —
+use the delta-table feature instead of full MV recomputation or a CDC stream.
+Two opt-in shapes: the `KI_HINT_DELTA_TABLE` scoped hint (placed after the table
+name, before the alias) for changes-only materialized views, and the
+`CREATE STREAM ... ON QUERY` pattern with `<delta_table> dt LEFT SEMI JOIN
+<lookup_table> lt` positional aliases for query-based streams. Both features
+work only on regular tables (no views, external tables, or MVs) and reflect
+inserts only — updates and deletes are invisible. Also covers MV refresh
+grammar (`REFRESH ON CHANGE` / `EVERY ... STARTING AT` / `STOP AFTER` /
+`EXECUTE AS`).
+See [references/delta-tables.md](references/delta-tables.md).
+
 ### Geospatial
 ST_* and accelerated STXY_* functions, H3 spatial indexing, SRID 4326 only,
 solution parameter (Euclidean/Haversine/Vincenty).
