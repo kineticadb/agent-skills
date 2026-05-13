@@ -6,18 +6,18 @@
 
 Knowledge skills that teach AI coding agents to work with [Kinetica](https://www.kinetica.com), a real-time GPU-accelerated analytical database. The agent learns Kinetica's SQL dialect, Python SDK, and interactive CLI — then activates the right skill automatically based on what you're doing.
 
-## Table of Contents
-
-- [🖥️ Supported Platforms](#supported-platforms)
-- [📦 Install](#install)
-- [🧠 Skills](#skills)
-- [🚀 Quick Start](#quick-start)
-- [⚙️ How It Works](#how-it-works)
-- [📁 Project Structure](#project-structure)
-- [🛠️ Development](#development)
-- [🤝 Contributing](#contributing)
-- [🧹 Uninstall / Reset](#uninstall--reset)
-- [📄 License](#license)
+| Section | What's there |
+| ------- | ------------ |
+| [🖥️ Supported Platforms](#supported-platforms) | Which AI agents and CLIs the skills work with |
+| [📦 Install](#install) | Universal installer, Claude Code marketplace, and manual copy |
+| [🧠 Skills](#skills) | The two bundled skills and their target audiences |
+| [🚀 Quick Start](#quick-start) | Example prompts that activate each skill |
+| [⚙️ How It Works](#how-it-works) | Two-tier loading and the `knowledge/` → `references/` pipeline |
+| [📁 Project Structure](#project-structure) | Directory layout for skills, knowledge, and the plugin mirror |
+| [🛠️ Development](#development) | Prereqs, build script, tests, and CI |
+| [🤝 Contributing](#contributing) | Workflow for adding or editing knowledge files |
+| [🧹 Uninstall / Reset](#uninstall--reset) | Removing the plugin and cleaning stale caches |
+| [📄 License](#license) | Apache-2.0 |
 
 ## <a id="supported-platforms"></a>🖥️ Supported Platforms
 
