@@ -85,10 +85,33 @@ Several columns encode their values as one letter. Decoders:
 | `ki_functions.kind` | `A`=aggregate, `C`=scalar, `P`=procedure, `S`=SQL, `U`=UDF |
 | `ki_load_history.load_kind` | `E`=export, `I`=import, `X`=subscription |
 | `ki_partitions.partition_type` | `HASH`, `INTERVAL`, `LIST`, `RANGE`, `SERIES` |
-| `ki_tiered_objects.tier` / `ki_partitions.tier` | `PERSIST`, `RAM` |
+| `ki_tiered_objects.tier` / `ki_partitions.tier` | `VRAM`, `RAM`, `DISK0`, `PERSIST` (data flows down when evicted) |
+| `ki_tiered_objects.priority` | `1`=system / `ki_catalog` (never evict), `5`=regular user table, `9`=temporary / ephemeral (evicted first). Higher = more expendable. |
 | `ki_indexes.index_type` | `cagra`, `chunk_skip`, `column`, `geospatial`, `hnsw` |
 | `ki_streams.event_type` | `insert`, `update`, `delete` |
 | `ki_query_workers.status` | `cancelled`, `completed`, `failed`, `paused`, `running` |
+
+## `ki_tiered_objects` — Column Reference
+
+`ki_tiered_objects` tracks per-chunk tier placement for every data object across
+all ranks. Each row is one chunk (a column segment, index fragment, etc.) and
+the tier it currently lives in. For most per-table investigations, filter
+`outer_object = '<schema>.<table>'` (see Gotchas — `id` is not safe to filter on).
+
+| Column                 | Type    | Meaning                                      | Diagnostic use |
+|------------------------|---------|----------------------------------------------|----------------|
+| `size`                 | long    | Bytes occupied in current tier (per chunk)   | Identify large objects consuming tier capacity |
+| `id`                   | char256 | String identifier `@table@oid[col][chunk]`   | Opaque — do NOT join to `ki_objects.oid` |
+| `tier`                 | char32  | `VRAM` / `RAM` / `DISK0` / `PERSIST`         | Where the chunk currently lives |
+| `priority`             | int     | 1=system, 5=user, 9=temp                     | Eviction order within tier (higher = first out) |
+| `evictable`            | bool    | Tier manager may move to a lower tier        | Find non-evictable objects blocking space |
+| `locked`               | bool    | Pinned in current tier                       | Locked objects cannot be evicted regardless of pressure |
+| `pin_count`            | int     | Active reference count                       | High = actively used |
+| `ram_evictions`        | int     | Times evicted from RAM                       | High = memory pressure thrashing |
+| `persist_evictions`    | int     | Times evicted from PERSIST                   | High = persist tier pressure |
+| `owner_resource_group` | char128 | Resource group that owns the allocation      | Tie back to resource group limits |
+| `source_rank`          | int     | Which rank holds this chunk (dict-encoded)   | Per-rank tier analysis |
+| `outer_object`         | char256 | Parent object name (`<schema>.<table>`), nullable | The safe per-table filter key |
 
 ## Canonical Queries
 
@@ -120,6 +143,31 @@ WHERE tier = 'PERSIST'
   AND id NOT LIKE 'Wal%'
 GROUP BY ROLLUP(source_rank)
 ORDER BY INT(source_rank) NULLS LAST
+```
+
+### Locked Objects (Cannot Be Evicted)
+
+```sql
+SELECT outer_object, tier, SUM(size) AS bytes, source_rank, owner_resource_group
+FROM ki_catalog.ki_tiered_objects
+WHERE locked = 1
+GROUP BY outer_object, tier, source_rank, owner_resource_group
+ORDER BY bytes DESC
+LIMIT 20
+```
+
+### High Eviction Churn (Memory Pressure Indicator)
+
+```sql
+SELECT outer_object, tier, SUM(size) AS bytes,
+       SUM(ram_evictions) AS ram_evictions,
+       SUM(persist_evictions) AS persist_evictions,
+       source_rank
+FROM ki_catalog.ki_tiered_objects
+WHERE ram_evictions > 0 OR persist_evictions > 0
+GROUP BY outer_object, tier, source_rank
+ORDER BY ram_evictions + persist_evictions DESC
+LIMIT 20
 ```
 
 ### Specific MV Dependencies (parent & child objects)
@@ -227,6 +275,22 @@ ORDER BY running_seconds DESC
 - **Tiered-object queries require `outer_object`** — to scope `ki_tiered_objects`
   to a single table, filter `outer_object = '<schema>.<table>'`. Filtering
   `object_name` or `id` will miss chunks or give misleading rollups.
+- **`ki_tiered_objects.id` is a string, NOT a numeric OID.** Format is
+  `@<table>@<oid>[<col_or_chunk_type>][<chunk>]` (e.g.,
+  `@nyctaxi@365[col][0]`). Do NOT join it to `ki_objects.oid` — the types
+  don't match and the values don't correspond. Use `outer_object` for
+  per-table filtering instead.
+- **`size` in `ki_tiered_objects` is per-chunk, not per-table** — every diagnostic
+  needs a `SUM(size)` aggregate over the matching rows. A raw `size` column read
+  understates per-table footprint.
+- **Rank 0 has no tiered objects** — it's the head/coordinator (metadata only).
+  All `ki_tiered_objects` rows live on worker ranks (1+). An empty result for
+  rank 0 is expected, not a signal of imbalance.
+- **`VRAM` tier only exists on GPU clusters** — CPU-only clusters top out at
+  `RAM`. Don't flag missing `VRAM` rows as a problem.
+- **`source_rank` is dict-encoded** — efficient to filter/group on, but the
+  underlying values are still integers; cast with `STRING(source_rank)` when
+  building human-readable output (see the RAM/Disk usage queries above).
 - **`ki_query_history` excludes multi-head ingest/egress** and direct DML
   endpoint calls (`/insert/records`, `/update/records`, `/delete/records`,
   `/delete/records/bystring`). It only records SQL submitted through
@@ -247,8 +311,13 @@ ORDER BY running_seconds DESC
 
 ## See Also
 
+- [catalog-joins.md](catalog-joins.md) — canonical correlation paths between
+  `ki_catalog` tables (object→stat→partitions→columns, type-OID lookup,
+  query-span drill-down, permission audit)
 - [virtual-catalog-ansi.md](virtual-catalog-ansi.md) — ANSI / `information_schema`
   views (portable standard views layered over this catalog)
 - [security-reference.md](security-reference.md) — the GRANT/REVOKE DDL whose
   effects show up in `ki_object_permissions` and `ki_role_members`
 - [ddl-reference.md](ddl-reference.md) — DDL for the objects inventoried here
+- [version-quirks.md](version-quirks.md) — catalog tables that don't exist in
+  7.2.x (`ki_tables`, `ki_version`) and `ki_columns` column-naming overrides

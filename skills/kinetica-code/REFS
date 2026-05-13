@@ -2,6 +2,7 @@
 kinetica-core-rules.md
 curl-api-reference.md
 error-handling.md
+version-quirks.md
 
 # SQL Core
 sql-functions.md

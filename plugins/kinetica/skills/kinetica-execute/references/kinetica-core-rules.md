@@ -32,6 +32,7 @@ These PostgreSQL features work in Kinetica without modification:
 8. **No trailing semicolons** — omit `;` at end of queries.
 9. **Default LIMIT 100** — always append unless user specifies otherwise.
 10. **Cannot ORDER BY array columns** — columns with type `array<...>` (shown by `describe-table`) cannot appear in `ORDER BY`. To sort by an array element, index it: `ORDER BY "col"[1]`. To sort rows containing arrays, use a non-array column instead.
+11. **Version-specific limits** — `ANALYZE TABLE`, `ALTER TABLE ... SET SHARD KEY`, and a handful of catalog tables / column names do not exist in 7.2.x. Before suggesting any of those, see [version-quirks.md](version-quirks.md) for the supported alternatives.
 
 ## Nested Aggregates — Mandatory CTE Pattern
 

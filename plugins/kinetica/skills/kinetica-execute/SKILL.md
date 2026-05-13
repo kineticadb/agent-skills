@@ -589,6 +589,10 @@ auto-filter by caller permissions.
 - `ki_catalog.*` — Kinetica-specific depth (`ki_tiered_objects` via `outer_object`, `ki_depend`,
   `ki_query_span_metrics_all`, `ki_rag_embeddings`, single-letter enum decoders). See
   [references/virtual-catalog-kinetica.md](references/virtual-catalog-kinetica.md).
+- Canonical join paths (object → stat → partitions → columns, type-OID lookup, query-span
+  drill-down, permission audit) — see [references/catalog-joins.md](references/catalog-joins.md).
+- 7.2.x-specific gotchas (no `ANALYZE TABLE`, shard keys immutable, `ki_tables`/`ki_version`
+  don't exist, `ki_columns` correct column names) — see [references/version-quirks.md](references/version-quirks.md).
 
 ### WMS / Visualization
 Heatmap, raster, class-break, contour, label, and isochrone rendering via the `/wms` endpoint.

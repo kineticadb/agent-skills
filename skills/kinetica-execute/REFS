@@ -4,6 +4,7 @@ api-reference.md
 curl-api-reference.md
 code-templates.md
 error-handling.md
+version-quirks.md
 
 # SQL Core
 sql-functions.md
@@ -42,6 +43,7 @@ security-reference.md
 # Schema Introspection & Virtual Catalogs
 virtual-catalog-kinetica.md
 virtual-catalog-ansi.md
+catalog-joins.md
 
 # WMS / Visualization
 wms-reference.md
