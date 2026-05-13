@@ -113,10 +113,10 @@ the tier it currently lives in. For most per-table investigations, filter
 | `source_rank`          | int     | Which rank holds this chunk (dict-encoded)   | Per-rank tier analysis |
 | `outer_object`         | char256 | Parent object name (`<schema>.<table>`), nullable | The safe per-table filter key |
 
-## Canonical Queries
+## Canonical Queries — Schema
 
-These are the patterns to reach for first. Substitute `<schema>.<table>` /
-`<mv_schema_name>.<mv_name>` as needed.
+Storage placement, dependencies, and column structure. Substitute
+`<schema>.<table>` / `<mv_schema_name>.<mv_name>` as needed.
 
 ### Table RAM Usage (by rank, with total)
 
@@ -204,24 +204,24 @@ JOIN ki_catalog.ki_objects child  ON child.oid  = dep_obj_oid
 ORDER BY 1, 2, 4
 ```
 
-### 10 Most Recent SQL Queries
+### Columns with Key Properties for a Table
 
 ```sql
-SELECT user_name, query_text, start_time
-FROM ki_catalog.ki_query_history
-WHERE query_text <> ''
-ORDER BY start_time DESC
-LIMIT 10
+SELECT c.column_name,
+       dt.sql_typename AS data_type,
+       c.is_nullable,
+       c.is_primary_key,
+       c.is_shard_key,
+       c.is_dist_encoded
+FROM ki_catalog.ki_columns c
+JOIN ki_catalog.ki_datatypes dt ON dt.oid = c.column_type_oid
+WHERE c.table_name = '<table>'
+ORDER BY c.oid
 ```
 
-### Import/Export Jobs with Errors in the Past Hour
+## Canonical Queries — Security
 
-```sql
-SELECT *
-FROM ki_catalog.ki_load_history
-WHERE num_errors > 0
-  AND start_time >= TIMESTAMPADD(HOUR, -1, NOW())
-```
+Roles, permissions, and row/column-level security.
 
 ### Roles with Row / Column Security Restrictions
 
@@ -245,19 +245,18 @@ FROM ki_catalog.ki_role_members
 ORDER BY 1, 2 DESC
 ```
 
-### Columns with Key Properties for a Table
+## Canonical Queries — Jobs
+
+Query history, running statements, and load/ingest jobs.
+
+### 10 Most Recent SQL Queries
 
 ```sql
-SELECT c.column_name,
-       dt.sql_typename AS data_type,
-       c.is_nullable,
-       c.is_primary_key,
-       c.is_shard_key,
-       c.is_dist_encoded
-FROM ki_catalog.ki_columns c
-JOIN ki_catalog.ki_datatypes dt ON dt.oid = c.column_type_oid
-WHERE c.table_name = '<table>'
-ORDER BY c.oid
+SELECT user_name, query_text, start_time
+FROM ki_catalog.ki_query_history
+WHERE query_text <> ''
+ORDER BY start_time DESC
+LIMIT 10
 ```
 
 ### Active Queries Older Than 30 Seconds
@@ -268,6 +267,50 @@ SELECT user_name, endpoint, execution_status, query_text,
 FROM ki_catalog.ki_query_active_all
 WHERE DATEDIFF(SECOND, start_time, NOW()) > 30
 ORDER BY running_seconds DESC
+```
+
+### Import/Export Jobs with Errors in the Past Hour
+
+```sql
+SELECT *
+FROM ki_catalog.ki_load_history
+WHERE num_errors > 0
+  AND start_time >= TIMESTAMPADD(HOUR, -1, NOW())
+```
+
+### Top 10 longest running queries in the past 6 hours
+
+```sql
+select query_id,
+  TIMESTAMPDIFF(SECOND, start_time, stop_time) as time_sec,
+  user_name,
+  user_data,
+  query_text
+from ki_catalog.ki_query_history
+where start_time >= TIMESTAMPADD(HOUR, -6, NOW())
+order by time_sec desc
+limit 10
+```
+
+### SQL Query statistics by user for the past 6 hours
+
+```sql
+with qry_times as (
+  select user_name,
+    resource_group,
+    TIMESTAMPDIFF(SECOND, start_time, stop_time) ts
+  from ki_catalog.ki_query_history
+  where start_time >= TIMESTAMPADD(MINUTE, -60 * 6, CURRENT_TIMESTAMP())
+)
+select user_name, resource_group,
+  count(1) req_count,
+  sum(ts) as req_sum_sec,
+  avg(ts) as req_avg_sec,
+  min(ts) as req_min_sec,
+  max(ts) as req_max_sec
+from qry_times
+group by user_name, resource_group
+order by req_sum_sec desc
 ```
 
 ## Gotchas
