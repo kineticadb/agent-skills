@@ -1,8 +1,16 @@
+# Foundation
 kinetica-core-rules.md
+curl-api-reference.md
+error-handling.md
+
+# SQL Core
 sql-functions.md
 sql-patterns.md
+
+# DDL & DML
 ddl-reference.md
-delta-tables.md
 dml-reference.md
+delta-tables.md
+
+# UDFs, Procedures & ML
 udf-reference.md
-curl-api-reference.md

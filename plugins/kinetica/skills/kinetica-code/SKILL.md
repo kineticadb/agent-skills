@@ -8,7 +8,7 @@ description: >-
 license: Apache-2.0
 metadata:
   author: kinetica
-  version: "1.0.50"
+  version: "1.0.51"
 ---
 
 # Kinetica Application Development
@@ -219,7 +219,7 @@ df = query_to_dataframe(db, """
 
 1. Always use parameterized queries — never string-interpolate user input into SQL
 2. Use `LIMIT` on exploration queries to avoid pulling entire tables
-3. Handle `gpudb.GPUdbException` for connection and query errors
+3. Handle `gpudb.GPUdbException` for connection and query errors — for common error symptoms and their one-step remediations (missing env vars, `gpudb` install failures on Python 3.14+, etc.), see `references/error-handling.md`
 4. Close connections when done in long-running applications
 5. For bulk ingest, prefer `insert_records_from_payload` over row-by-row INSERT
 6. Remember Kinetica SQL rules from the core rules reference — especially DATEDIFF/DATEADD instead of timestamp arithmetic

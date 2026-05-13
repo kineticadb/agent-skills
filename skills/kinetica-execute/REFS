@@ -1,21 +1,47 @@
-api-reference.md
+# Foundation
 kinetica-core-rules.md
+api-reference.md
+curl-api-reference.md
+code-templates.md
+error-handling.md
+
+# SQL Core
 sql-functions.md
 sql-patterns.md
+
+# DDL & DML
 ddl-reference.md
-delta-tables.md
 dml-reference.md
+delta-tables.md
+
+# Geospatial
 geospatial-functions.md
 geospatial-examples.md
+
+# Time-Series
 timeseries-functions.md
 timeseries-examples.md
+
+# Vector Search & Embeddings
 vector-patterns.md
+
+# JSON, Arrays & Text Search
 json-array-text.md
+
+# Graph Analytics
 graph-functions.md
 graph-examples.md
+graph-workflows.md
+
+# UDFs, Procedures & ML
 udf-reference.md
-curl-api-reference.md
+
+# Security & Administration
 security-reference.md
-wms-reference.md
+
+# Schema Introspection & Virtual Catalogs
 virtual-catalog-kinetica.md
 virtual-catalog-ansi.md
+
+# WMS / Visualization
+wms-reference.md
