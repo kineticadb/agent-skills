@@ -149,6 +149,40 @@ CREATE TABLE "schema"."docs" (
 )
 ```
 
+### Standalone CREATE INDEX / DROP INDEX
+
+For adding or removing an index on an existing table without rewriting the
+`CREATE TABLE` statement:
+
+```sql
+-- Single column
+CREATE INDEX "idx_users_email" ON "schema"."users" ("email")
+
+-- Composite index
+CREATE INDEX "idx_orders_user_status" ON "schema"."orders" ("user_id", "status")
+
+-- Drop an index
+DROP INDEX "idx_users_email" ON "schema"."users"
+```
+
+**Key rules:**
+
+- **Index name is REQUIRED and goes BEFORE `ON`.** Kinetica has no
+  "unnamed index" form — `CREATE INDEX ON "users" ("email")` is a syntax error.
+- **`IF NOT EXISTS` is NOT supported on CREATE INDEX.** Before creating, query
+  `ki_catalog.ki_indexes` to check whether an index already covers the
+  column(s); retrying on a duplicate-name error pollutes audit logs.
+- **Verify with `EXPLAIN`.** Run `EXPLAIN` on the target query before and after
+  index creation. If the plan doesn't pick up the index, the query may not
+  benefit — there is no `ANALYZE TABLE` to force a stats refresh
+  (see [version-quirks.md](version-quirks.md)).
+- **Naming convention:** prefer `idx_<table>_<column>` or
+  `idx_<table>_<cols>_<purpose>` so index names stay discoverable in
+  `ki_catalog.ki_indexes`.
+- For inline index syntax (in `CREATE TABLE`) and the available index *types*
+  (`GEOSPATIAL`, `CAGRA`, `HNSW`, `CHUNK SKIP`, `LOW CARDINALITY`), see the
+  Index Types table above.
+
 ## Table Properties
 
 ```sql
@@ -187,6 +221,51 @@ ALTER TABLE "schema"."table" SET ACCESS MODE READ_ONLY
 ALTER TABLE "schema"."table" ADD GEOSPATIAL INDEX ("location")
 ALTER TABLE "schema"."table" ADD CAGRA INDEX ("embedding")
 ```
+
+### ALTER COLUMN — Column Property Syntax
+
+Kinetica's syntax for column properties (`DICT`, `TEXT_SEARCH`, `COMPRESS`, …) differs
+from standard SQL in two non-obvious ways:
+
+1. **Properties live INSIDE the type parentheses** — not as trailing clauses.
+2. **There is no `SET`/`ADD`/`DROP` for individual properties** — every change
+   requires repeating the FULL column definition.
+
+```sql
+-- Add DICT encoding (correct — properties inside parens):
+ALTER TABLE "schema"."table" ALTER COLUMN "col" VARCHAR(50, DICT)
+
+-- Equivalent — MODIFY COLUMN is a synonym for ALTER COLUMN:
+ALTER TABLE "schema"."table" MODIFY COLUMN "col" VARCHAR(50, DICT)
+
+-- Remove DICT (omit it from the redefinition):
+ALTER TABLE "schema"."table" ALTER COLUMN "col" VARCHAR(50)
+
+-- Bundle multiple column changes in one statement:
+ALTER TABLE "schema"."table"
+    ALTER COLUMN "col1" VARCHAR(50, DICT),
+    ALTER COLUMN "col2" VARCHAR(100, TEXT_SEARCH) NOT NULL,
+    ALTER COLUMN "col3" INT (DICT)
+```
+
+**Key rules:**
+
+- `VARCHAR(50, DICT)` — NOT `VARCHAR(50) DICT`. Placing the property outside the
+  parens is a syntax error.
+- Full definition required: type, size, properties, and nullability must all be
+  repeated. There is no `ALTER COLUMN "col" SET DICT` syntax.
+- Available column properties (same as `CREATE TABLE`): `DICT`, `TEXT_SEARCH`,
+  `COMPRESS(type)`, `IPV4`, `NORMALIZE`, `INIT_WITH_NOW`, `INIT_WITH_UUID`,
+  `UPDATE_WITH_NOW`.
+- **Cascade — dependent objects are DROPPED.** When you `ALTER COLUMN` a column
+  referenced by a view, materialized view, or SQL procedure, those dependents
+  are dropped (not refreshed). Check `ki_catalog.ki_depend` for the dependency
+  graph *before* altering a column, and warn the user before running. See
+  [virtual-catalog-kinetica.md](virtual-catalog-kinetica.md) for the dependency
+  query.
+- **Shard keys are immutable** — `ALTER TABLE ... SET SHARD KEY` is not
+  supported. To change a shard key, drop and recreate the table. See
+  [version-quirks.md](version-quirks.md).
 
 ## CREATE TABLE AS SELECT (CTAS)
 
