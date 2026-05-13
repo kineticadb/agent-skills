@@ -1,14 +1,19 @@
 ---
 name: kinetica-code
 description: >-
-  Activate when the user is building Python applications that interact with Kinetica, using
-  the Kinetica Python SDK (gpudb) or REST API, or building data pipelines that connect to
-  a Kinetica GPU database. Also activate when the user mentions bulk data ingest, Kinetica
-  connectors, or the gpudb package.
+  Activate when the user is WRITING APPLICATION CODE that programmatically interacts with
+  a Kinetica GPU database — Python or Node apps, microservices, ETL scripts, or streaming
+  data pipelines that import the gpudb SDK, call the Kinetica REST API from app code, or
+  wire up Kinetica connectors (Spark, Kafka, JDBC, Airflow, Flink). Trigger on requests
+  like "write a Python script that ingests this CSV into Kinetica", "build a FastAPI
+  endpoint backed by Kinetica", "set up a Kafka to Kinetica pipeline", "use the gpudb
+  client to upsert records", or any request for source code the user will save, version,
+  and run as part of an application. Do NOT use for ad-hoc SQL, one-off table inspection,
+  schema exploration, admin commands, or map tile rendering — those go to kinetica-execute.
 license: Apache-2.0
 metadata:
   author: kinetica
-  version: "1.0.53"
+  version: "1.0.54"
 ---
 
 # Kinetica Application Development

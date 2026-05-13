@@ -1,21 +1,26 @@
 ---
 name: kinetica-execute
 description: >-
-  Use when interacting with a Kinetica GPU database — running SQL queries, exploring table
-  schemas, graph analytics (shortest path, PageRank, TSP), geospatial filtering, WMS map
-  tile rendering (heatmaps, contours, rasters, class-breaks, labels, isochrones from x/y
-  or WKT data), data import/export, or table monitoring. Provides an interactive CLI via
-  Node.js or Python. Activate even for simple tasks like checking table counts or running
-  a quick query against Kinetica. Also covers SQL analytics (geospatial, time-series,
-  graph, vector search), EXPLAIN plans, system table queries, security configuration,
-  and database administration.
+  Activate for INTERACTIVE EXPLORATION, QUERYING, and ADMINISTRATION of an existing
+  Kinetica GPU database via its CLI — running SQL queries, inspecting table schemas and
+  row counts, browsing data, one-shot data import/export, graph analytics (shortest path,
+  PageRank, TSP), geospatial filtering, WMS map tile rendering (heatmaps, contours,
+  rasters, class-breaks, labels, isochrones from x/y or WKT data), EXPLAIN plans, system
+  table queries, table monitoring, security configuration, and database administration.
+  Trigger on requests like "what tables are in schema X?", "how many rows in foo?", "show
+  me the schema of bar", "find records where lat is in this bbox", "render a heatmap of
+  column Y", "EXPLAIN this query", or any request where the user wants an answer FROM the
+  database rather than code that talks to it. Activate even for simple tasks like checking
+  table counts or running a quick query. Do NOT use when the user is writing an
+  application, SDK client, or production data pipeline in source code — those go to
+  kinetica-code.
 license: Apache-2.0
 compatibility: Requires Node.js 18+ or Python 3.8+ and network access to a Kinetica database
 argument-hint: <sql-or-action>
 user-invocable: true
 metadata:
   author: kinetica
-  version: "1.0.53"
+  version: "1.0.54"
 ---
 
 # Kinetica DB Skill
